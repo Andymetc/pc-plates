@@ -109,6 +109,7 @@ function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padSta
 function sameDay(a, b) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
 
 function PersonDot({ name, colorMap, size = 18, fontSize = 7 }) {
+  if (!name) return null;
   const color = colorMap[name] || "#999";
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
@@ -117,7 +118,7 @@ function PersonDot({ name, colorMap, size = 18, fontSize = 7 }) {
         display: "flex", alignItems: "center", justifyContent: "center",
         color: "#fff", fontSize: size * 0.55, fontWeight: 700, lineHeight: 1,
         boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-      }}>{name ? name.charAt(0).toUpperCase() : "?"}</div>
+      }}>{name.charAt(0).toUpperCase()}</div>
       <span style={{ fontSize, color, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>{name}</span>
     </div>
   );
@@ -133,18 +134,25 @@ function Select({ value, options, onChange, style }) {
 }
 
 function PersonSelect({ label, value, options, colorMap, onChange }) {
-  const color = colorMap[value] || "#999";
+  const color = value ? (colorMap[value] || "#999") : "#ccc";
   return (
     <div>
       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#999", marginBottom: 4, fontWeight: 600 }}>{label}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ width: 24, height: 24, borderRadius: "50%", background: color, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700 }}>
-          {value.charAt(0)}
-        </div>
-        <select value={value} onChange={e => onChange(e.target.value)} style={{
+        {value ? (
+          <div style={{ width: 24, height: 24, borderRadius: "50%", background: color, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700 }}>
+            {value.charAt(0)}
+          </div>
+        ) : (
+          <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#f0f0f0", flexShrink: 0, border: "1.5px dashed #ccc" }} />
+        )}
+        <select value={value || ""} onChange={e => onChange(e.target.value)} style={{
           border: "1px solid #ddd", borderRadius: 6, padding: "6px 8px", fontSize: 12,
           fontFamily: "'DM Sans', sans-serif", background: "#fff", flex: 1,
-        }}>{options.map(o => <option key={o} value={o}>{o}</option>)}</select>
+        }}>
+          <option value="">— None —</option>
+          {options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
       </div>
     </div>
   );
@@ -185,17 +193,34 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onVendorClick, vendors }
             </div>
             <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'Playfair Display', serif" }}>{post.spot}</div>
           </div>
-          <button onClick={onClose} style={{
-            background: "rgba(255,255,255,0.2)", border: "none", color: "#fff",
-            width: 32, height: 32, borderRadius: "50%", cursor: "pointer", fontSize: 18,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>×</button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={() => update("done", !post.done)} title={post.done ? "Mark as not done" : "Mark as done"} style={{
+              background: post.done ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.2)",
+              border: "none", color: post.done ? "#2E7D32" : "rgba(255,255,255,0.6)",
+              width: 32, height: 32, borderRadius: "50%", cursor: "pointer", fontSize: 16,
+              display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900,
+            }}>✓</button>
+            <button onClick={onClose} style={{
+              background: "rgba(255,255,255,0.2)", border: "none", color: "#fff",
+              width: 32, height: 32, borderRadius: "50%", cursor: "pointer", fontSize: 18,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>×</button>
+          </div>
         </div>
+        {post.done && (
+          <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.9)", background: "rgba(0,0,0,0.15)", borderRadius: 6, padding: "3px 10px", display: "inline-block" }}>
+            ✓ Done
+          </div>
+        )}
       </div>
       <div style={{ padding: "16px 20px", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", gap: 12 }}>
-          <div style={{ flex: 1 }}><PersonSelect label="MA" value={post.ma} options={MAs} colorMap={MA_COLORS} onChange={v => update("ma", v)} /></div>
-          <div style={{ flex: 1 }}><PersonSelect label="PA" value={post.pa} options={PAs} colorMap={PA_COLORS} onChange={v => update("pa", v)} /></div>
+          <div style={{ flex: 1 }}><PersonSelect label="MA" value={post.ma || ""} options={MAs} colorMap={MA_COLORS} onChange={v => update("ma", v)} /></div>
+          <div style={{ flex: 1 }}><PersonSelect label="MA 2" value={post.ma2 || ""} options={MAs} colorMap={MA_COLORS} onChange={v => update("ma2", v)} /></div>
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ flex: 1 }}><PersonSelect label="PA" value={post.pa || ""} options={PAs} colorMap={PA_COLORS} onChange={v => update("pa", v)} /></div>
+          <div style={{ flex: 1 }}><PersonSelect label="PA 2" value={post.pa2 || ""} options={PAs} colorMap={PA_COLORS} onChange={v => update("pa2", v)} /></div>
         </div>
         <div>
           <Label>Post Date</Label>
@@ -567,7 +592,7 @@ export default function App() {
 
   const addPostOnDate = (date) => {
     const newId = Math.max(0, ...posts.map(p => p.id)) + 1;
-    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: fmtDate(date), ma: MAs[0], pa: PAs[0] }]);
+    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: fmtDate(date), ma: "", ma2: "", pa: "", pa2: "", done: false }]);
     setSelectedId(newId);
   };
 
@@ -696,6 +721,7 @@ export default function App() {
                               fontFamily: "'DM Sans', sans-serif",
                             }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 3, marginBottom: 3 }}>
+                                {p.done && <span style={{ color: "#2E7D32", fontWeight: 900, fontSize: 10, flexShrink: 0, lineHeight: 1 }}>✓</span>}
                                 {vendors[p.spot] && (
                                   <button onClick={(e) => { e.stopPropagation(); setActiveVendor(p.spot); }} title="Vendor details" style={{
                                     background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 10, lineHeight: 1, flexShrink: 0,
@@ -708,9 +734,11 @@ export default function App() {
                                   {p.spot === "TBD" ? "TBD" : p.spot.length > 13 ? p.spot.slice(0,11) + "…" : p.spot}
                                 </button>
                               </div>
-                              <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+                              <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
                                 <PersonDot name={p.ma} colorMap={MA_COLORS} size={16} fontSize={6} />
+                                <PersonDot name={p.ma2} colorMap={MA_COLORS} size={16} fontSize={6} />
                                 <PersonDot name={p.pa} colorMap={PA_COLORS} size={16} fontSize={6} />
+                                <PersonDot name={p.pa2} colorMap={PA_COLORS} size={16} fontSize={6} />
                               </div>
                             </div>
                           );
@@ -736,9 +764,19 @@ export default function App() {
               return (
                 <div key={p.id} onClick={() => setSelectedId(p.id)} style={{
                   display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-                  background: "#fff", border: "1px solid #eee", borderLeft: `4px solid ${c.accent}`,
+                  background: p.done ? "#F1F8E9" : "#fff",
+                  border: `1px solid ${p.done ? "#C8E6C9" : "#eee"}`,
+                  borderLeft: `4px solid ${p.done ? "#2E7D32" : c.accent}`,
                   borderRadius: 8, cursor: "pointer",
                 }}>
+                  <button onClick={(e) => { e.stopPropagation(); updatePost(p.id, "done", !p.done); }} title={p.done ? "Mark undone" : "Mark done"} style={{
+                    width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                    border: `2px solid ${p.done ? "#2E7D32" : "#ccc"}`,
+                    background: p.done ? "#2E7D32" : "#fff",
+                    color: p.done ? "#fff" : "#ccc",
+                    cursor: "pointer", fontSize: 13, fontWeight: 900,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>✓</button>
                   <div style={{ minWidth: 40, textAlign: "center", color: c.accent, background: c.bg, borderRadius: 6, padding: "5px 4px", fontWeight: 700, fontSize: 11, lineHeight: 1.2 }}>
                     <div style={{ fontSize: 15 }}>{d.getDate()}</div>
                     <div style={{ fontSize: 8, textTransform: "uppercase" }}>{DAYS_SHORT[d.getDay()]}</div>
@@ -746,7 +784,7 @@ export default function App() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                       {vendors[p.spot] && <span style={{ fontSize: 14 }}>{vendors[p.spot].emoji}</span>}
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e" }}>{p.spot}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e", textDecoration: p.done ? "line-through" : "none", opacity: p.done ? 0.6 : 1 }}>{p.spot}</span>
                       {vendors[p.spot] && (
                         <button onClick={(e) => { e.stopPropagation(); setActiveVendor(p.spot); }} title="Vendor details" style={{
                           fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", padding: "0 2px",
@@ -755,9 +793,11 @@ export default function App() {
                     </div>
                     <div style={{ fontSize: 11, color: "#888", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{p.order}</div>
                   </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                     <PersonDot name={p.ma} colorMap={MA_COLORS} size={22} fontSize={8} />
+                    <PersonDot name={p.ma2} colorMap={MA_COLORS} size={22} fontSize={8} />
                     <PersonDot name={p.pa} colorMap={PA_COLORS} size={22} fontSize={8} />
+                    <PersonDot name={p.pa2} colorMap={PA_COLORS} size={22} fontSize={8} />
                   </div>
                   <div style={{ fontSize: 10, fontWeight: 600, color: c.accent, background: c.bg, borderRadius: 10, padding: "2px 8px", whiteSpace: "nowrap" }}>{p.series}</div>
                   <div style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>{p.cost}</div>
