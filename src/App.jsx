@@ -546,6 +546,7 @@ async function savePosts(posts) {
   const { error } = await supabase.from(TABLE).upsert({ id: ROW_ID, posts }, { onConflict: "id" });
   if (error) console.error("Save error:", error);
   else console.log("Saved", posts.length, "posts");
+  pushToSheet("posts", posts);
 }
 
 const VENDOR_TABLE = "vendors";
@@ -560,6 +561,18 @@ async function fetchVendors() {
 async function saveVendors(vendorData) {
   const { error } = await supabase.from(VENDOR_TABLE).upsert({ id: VENDOR_ROW_ID, data: vendorData }, { onConflict: "id" });
   if (error) console.error("Vendor save error:", error);
+  pushToSheet("vendors", vendorData);
+}
+
+// Fire-and-forget push to Google Sheet via Apps Script web app
+function pushToSheet(type, data) {
+  const url = import.meta.env.VITE_APPS_SCRIPT_URL;
+  if (!url) return; // not configured — skip silently
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, data }),
+  }).catch(() => {}); // ignore errors — sheet sync is best-effort
 }
 
 // ─── MAIN APP ───
