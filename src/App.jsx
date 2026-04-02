@@ -447,6 +447,89 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate }) {
   );
 }
 
+// ─── GOOGLE SHEETS SYNC ───
+
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/189P-4KRC1XBBMhVzUwDYKaWm0bf9xOcd/edit#gid=475468434";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/189P-4KRC1XBBMhVzUwDYKaWm0bf9xOcd/gviz/tq?tqx=out:csv&sheet=Content%20Calendar";
+
+const SHEET_SPOT_MAP = {
+  "Zanzibar": "Zanzibar Café at The Loft",
+  "Zanzibar + Su Pan": "Zanzibar Café at The Loft",
+  "CurryUp Now": "Curry Up Now",
+  "TapEx": "Tapioca Express",
+  "Froyo": "Yogurt World",
+  "Su Pan": "Su Pan Bakery",
+  "Santorini": "Santorini Greek Island Grill",
+  "POLL: Vote for Faves": "TBD",
+  "Audience Pick #1": "TBD",
+  "Audience Pick #2": "TBD",
+  "Best-Of Roundup": "Multiple / Roundup",
+  "Late Night Finals Ed.": "Multiple / Roundup",
+  "Last Call": "Multiple / Roundup",
+};
+
+const SHEET_SERIES_MAP = { "Desserts & Coffee": "Desserts & Drinks" };
+
+const SHEET_MONTH_MAP = { "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12 };
+
+function parseSheetDate(str) {
+  if (!str) return null;
+  const parts = str.trim().split(" ");
+  if (parts.length < 2) return null;
+  const month = SHEET_MONTH_MAP[parts[0]];
+  const day = parseInt(parts[1]);
+  if (!month || isNaN(day)) return null;
+  return `2026-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseSheetCSV(csv) {
+  const lines = csv.split("\n").map(l => l.trim()).filter(Boolean);
+  const posts = [];
+  let nextId = 1;
+  // Find the header row
+  const headerIdx = lines.findIndex(l => l.toLowerCase().includes("post date") && l.toLowerCase().includes("series"));
+  if (headerIdx < 0) return null;
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const row = lines[i].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(c => c.replace(/^"|"$/g, "").trim());
+    if (!row[1] || !row[3] || !row[4]) continue; // skip rows without date/series/spot
+    const date = parseSheetDate(row[1]);
+    if (!date) continue;
+    const rawSeries = row[3];
+    const rawSpot = row[4];
+    const series = SHEET_SERIES_MAP[rawSeries] || rawSeries;
+    const spot = SHEET_SPOT_MAP[rawSpot] || rawSpot;
+    if (!SERIES_LIST.includes(series)) continue; // skip non-post rows
+    posts.push({
+      id: nextId++,
+      series, spot,
+      order: row[5] || "",
+      format: row[6] || "",
+      hook: row[7] || "",
+      cost: row[8] || "$0",
+      date,
+      ma: "", ma2: "", pa: "", pa2: "", done: false,
+    });
+  }
+  return posts.length > 0 ? posts : null;
+}
+
+// ─── VENDOR DIRECTORY ───
+
+const LOCATION_GROUPS = [
+  { key: "Price Center", label: "Price Center", emoji: "🏢", color: "#1565C0", desc: "East & West" },
+  { key: "Student Center", label: "Student Center", emoji: "🎓", color: "#2E7D32", desc: "" },
+  { key: "Student Services Center", label: "Student Services Center", emoji: "🏛️", color: "#6A1B9A", desc: "" },
+];
+
+function getBuilding(location) {
+  if (!location) return "Other";
+  const l = location.toLowerCase();
+  if (l.includes("price center")) return "Price Center";
+  if (l.includes("student center")) return "Student Center";
+  if (l.includes("student services")) return "Student Services Center";
+  return "Other";
+}
+
 // ─── SUPABASE SYNC ───
 
 const TABLE = "calendar";
@@ -489,6 +572,8 @@ export default function App() {
   const [vendors, setVendors] = useState(VENDORS_DEFAULT);
   const [view, setView] = useState("calendar");
   const [synced, setSynced] = useState(false);
+  const [sheetSyncing, setSheetSyncing] = useState(false);
+  const [sheetMsg, setSheetMsg] = useState(null);
   const saveTimer = useRef(null);
   const lastSavedJson = useRef("");
   const isRemoteUpdate = useRef(false);
@@ -587,6 +672,29 @@ export default function App() {
     saveVendors(next);
   };
 
+  const syncFromSheet = async () => {
+    setSheetSyncing(true);
+    setSheetMsg(null);
+    try {
+      const res = await fetch(SHEET_CSV_URL);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const csv = await res.text();
+      const imported = parseSheetCSV(csv);
+      if (!imported) throw new Error("Could not parse sheet data");
+      if (!window.confirm(`Import ${imported.length} posts from Google Sheet? This will replace current posts (assignments/done status won't be affected if you re-assign after).`)) {
+        setSheetSyncing(false);
+        return;
+      }
+      setPosts(imported);
+      setSheetMsg(`✓ Imported ${imported.length} posts`);
+    } catch (e) {
+      console.error("Sheet sync error:", e);
+      setSheetMsg("⚠ Could not fetch sheet — make sure it's shared as 'Anyone with the link'");
+    }
+    setSheetSyncing(false);
+    setTimeout(() => setSheetMsg(null), 5000);
+  };
+
   const updatePost = (id, key, val) => setPosts(prev => prev.map(p => p.id === id ? { ...p, [key]: val } : p));
   const deletePost = (id) => { setPosts(prev => prev.filter(p => p.id !== id)); if (selectedId === id) setSelectedId(null); };
 
@@ -611,10 +719,25 @@ export default function App() {
   return (
     <div style={{ fontFamily: "'DM Sans', sans-serif", background: "#FAFAF8", minHeight: "100vh", padding: "20px 16px" }}>
       <div style={{ maxWidth: 1000, margin: "0 auto 16px" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 2 }}>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>PC Plates</h1>
-          <span style={{ fontSize: 12, color: "#999", fontWeight: 500 }}>Spring 2026 · @ucsdcenters</span>
-          <span style={{ fontSize: 10, color: synced ? "#2E7D32" : "#999", fontWeight: 600 }}>{synced ? "● Synced" : "○ Connecting..."}</span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 2 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+            <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>PC Plates</h1>
+            <span style={{ fontSize: 12, color: "#999", fontWeight: 500 }}>Spring 2026 · @ucsdcenters</span>
+            <span style={{ fontSize: 10, color: synced ? "#2E7D32" : "#999", fontWeight: 600 }}>{synced ? "● Synced" : "○ Connecting..."}</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <a href={SHEET_URL} target="_blank" rel="noreferrer" style={{
+              display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 8,
+              border: "1px solid #1E88E5", background: "#E3F2FD", color: "#1565C0",
+              fontSize: 11, fontWeight: 600, textDecoration: "none", fontFamily: "'DM Sans', sans-serif",
+            }}>📊 Google Sheet</a>
+            <button onClick={syncFromSheet} disabled={sheetSyncing} style={{
+              display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 8,
+              border: "1px solid #ddd", background: sheetSyncing ? "#f5f5f5" : "#fff", color: sheetSyncing ? "#aaa" : "#555",
+              fontSize: 11, fontWeight: 600, cursor: sheetSyncing ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif",
+            }}>{sheetSyncing ? "⏳ Syncing…" : "↓ Import from Sheet"}</button>
+            {sheetMsg && <span style={{ fontSize: 11, color: sheetMsg.startsWith("✓") ? "#2E7D32" : "#E65100", fontWeight: 600 }}>{sheetMsg}</span>}
+          </div>
         </div>
         <p style={{ fontSize: 12, color: "#777", margin: "4px 0 12px" }}>
           {posts.length} posts · Click a post to edit · Click an empty date to add · Changes sync live for everyone
@@ -634,10 +757,17 @@ export default function App() {
             </button>
           ))}
           <div style={{ flex: 1 }} />
-          <button onClick={() => setView(view === "calendar" ? "list" : "calendar")} style={{
-            padding: "6px 14px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, background: "#fff", color: "#555",
-          }}>{view === "calendar" ? "List View" : "Calendar View"}</button>
+          {["calendar", "list", "vendors"].map(v => (
+            <button key={v} onClick={() => setView(v)} style={{
+              padding: "6px 14px", borderRadius: 8, cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600,
+              border: view === v ? "none" : "1px solid #ddd",
+              background: view === v ? "#1a1a2e" : "#fff",
+              color: view === v ? "#fff" : "#555",
+            }}>
+              {v === "calendar" ? "📅 Calendar" : v === "list" ? "📋 List" : "🏪 Vendors"}
+            </button>
+          ))}
           <button onClick={resetAll} style={{
             padding: "6px 14px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer",
             fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, background: "#fff", color: "#999",
@@ -807,6 +937,90 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* VENDORS VIEW */}
+      {view === "vendors" && (() => {
+        const grouped = {};
+        LOCATION_GROUPS.forEach(g => { grouped[g.key] = []; });
+        Object.entries(vendors).forEach(([name, v]) => {
+          if (name === "TBD" || name === "Multiple / Roundup") return;
+          const building = getBuilding(v.location || "");
+          if (grouped[building]) grouped[building].push({ name, ...v });
+        });
+        return (
+          <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>
+                University Centers — {Object.values(grouped).flat().length} vendors
+              </h3>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20, alignItems: "start" }}>
+              {LOCATION_GROUPS.map(group => {
+                const list = grouped[group.key] || [];
+                return (
+                  <div key={group.key} style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.07)", border: "1px solid #eee" }}>
+                    <div style={{ background: group.color, padding: "14px 18px", color: "#fff" }}>
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>{group.emoji}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px" }}>{group.label}</div>
+                      {group.desc && <div style={{ fontSize: 11, opacity: 0.8, marginTop: 1 }}>{group.desc}</div>}
+                      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>{list.length} vendors</div>
+                    </div>
+                    <div style={{ padding: "8px 0" }}>
+                      {list.sort((a, b) => a.name.localeCompare(b.name)).map((v, i) => {
+                        const postCount = posts.filter(p => p.spot === v.name).length;
+                        const doneCount = posts.filter(p => p.spot === v.name && p.done).length;
+                        const firstHours = Object.entries(v.hours || {})[0];
+                        return (
+                          <div key={v.name}
+                            onClick={() => setActiveVendor(v.name)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
+                              cursor: "pointer", transition: "background 0.12s",
+                              borderBottom: i < list.length - 1 ? "1px solid #f0f0ee" : "none",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = "#fafaf8"}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                          >
+                            <div style={{
+                              width: 38, height: 38, borderRadius: 10, background: `${v.color}18`,
+                              border: `1.5px solid ${v.color}40`,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 20, flexShrink: 0,
+                            }}>{v.emoji}</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
+                              <div style={{ fontSize: 10, color: "#999", marginTop: 1 }}>
+                                {firstHours ? `${firstHours[0]}: ${firstHours[1]}` : v.location}
+                              </div>
+                              {v.tags && v.tags.length > 0 && (
+                                <div style={{ display: "flex", gap: 3, marginTop: 4, flexWrap: "wrap" }}>
+                                  {v.tags.slice(0, 3).map(t => (
+                                    <span key={t} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 99, background: `${v.color}15`, color: v.color, fontWeight: 600, border: `1px solid ${v.color}25` }}>{t}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                              {postCount > 0 && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: doneCount === postCount ? "#2E7D32" : v.color, background: doneCount === postCount ? "#E8F5E9" : `${v.color}15`, borderRadius: 8, padding: "2px 7px" }}>
+                                    {doneCount === postCount && postCount > 0 ? "✓ Done" : `${doneCount}/${postCount} posts`}
+                                  </span>
+                                </div>
+                              )}
+                              <span style={{ fontSize: 16, color: "#ccc" }}>›</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Roster */}
       <div style={{ maxWidth: 1000, margin: "24px auto 40px" }}>
