@@ -449,8 +449,8 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate }) {
 
 // ─── GOOGLE SHEETS SYNC ───
 
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/189P-4KRC1XBBMhVzUwDYKaWm0bf9xOcd/edit#gid=475468434";
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/189P-4KRC1XBBMhVzUwDYKaWm0bf9xOcd/gviz/tq?tqx=out:csv&sheet=Content%20Calendar";
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/1RnahZx1wlVx9fD21fARrjyIIAC60OXCHC87M7jP727k/edit#gid=475468434";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1RnahZx1wlVx9fD21fARrjyIIAC60OXCHC87M7jP727k/gviz/tq?tqx=out:csv&sheet=Content%20Calendar";
 
 const SHEET_SPOT_MAP = {
   "Zanzibar": "Zanzibar Café at The Loft",
