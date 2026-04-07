@@ -222,12 +222,21 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onVendorClick, vendors }
           <div style={{ flex: 1 }}><PersonSelect label="PA" value={post.pa || ""} options={PAs} colorMap={PA_COLORS} onChange={v => update("pa", v)} /></div>
           <div style={{ flex: 1 }}><PersonSelect label="PA 2" value={post.pa2 || ""} options={PAs} colorMap={PA_COLORS} onChange={v => update("pa2", v)} /></div>
         </div>
-        <div>
-          <Label>Post Date</Label>
-          <input type="date" value={post.date} onChange={e => update("date", e.target.value)} style={{
-            border: "1px solid #ddd", borderRadius: 6, padding: "6px 8px", fontSize: 12,
-            fontFamily: "'DM Sans', sans-serif", width: "100%",
-          }} />
+        <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <Label>Record Food Date</Label>
+            <input type="date" value={post.foodDate || ""} onChange={e => update("foodDate", e.target.value)} style={{
+              border: "1px solid #ddd", borderRadius: 6, padding: "6px 8px", fontSize: 12,
+              fontFamily: "'DM Sans', sans-serif", width: "100%",
+            }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <Label>Post Date</Label>
+            <input type="date" value={post.date} onChange={e => update("date", e.target.value)} style={{
+              border: "1px solid #ddd", borderRadius: 6, padding: "6px 8px", fontSize: 12,
+              fontFamily: "'DM Sans', sans-serif", width: "100%",
+            }} />
+          </div>
         </div>
         <div><Label>Series</Label><Select value={post.series} options={SERIES_LIST} onChange={v => update("series", v)} /></div>
         <div>
@@ -713,7 +722,7 @@ export default function App() {
 
   const addPostOnDate = (date) => {
     const newId = Math.max(0, ...posts.map(p => p.id)) + 1;
-    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: fmtDate(date), ma: "", ma2: "", pa: "", pa2: "", done: false }]);
+    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: fmtDate(date), foodDate: "", ma: "", ma2: "", pa: "", pa2: "", done: false }]);
     setSelectedId(newId);
   };
 
@@ -781,10 +790,6 @@ export default function App() {
               {v === "calendar" ? "📅 Calendar" : v === "list" ? "📋 List" : "🏪 Vendors"}
             </button>
           ))}
-          <button onClick={resetAll} style={{
-            padding: "6px 14px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, background: "#fff", color: "#999",
-          }}>Reset</button>
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 14 }}>
@@ -877,6 +882,12 @@ export default function App() {
                                   {p.spot === "TBD" ? "TBD" : p.spot.length > 13 ? p.spot.slice(0,11) + "…" : p.spot}
                                 </button>
                               </div>
+                              {p.foodDate && (
+                                <div style={{ fontSize: 8, color: "#888", fontWeight: 600, marginBottom: 2, display: "flex", alignItems: "center", gap: 2 }}>
+                                  <span style={{ color: "#E65100" }}>🎬</span>
+                                  {(() => { const d = parseDate(p.foodDate); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })()}
+                                </div>
+                              )}
                               <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
                                 <PersonDot name={p.ma} colorMap={MA_COLORS} size={16} fontSize={6} />
                                 <PersonDot name={p.ma2} colorMap={MA_COLORS} size={16} fontSize={6} />
