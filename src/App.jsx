@@ -618,6 +618,9 @@ export default function App() {
   const [synced, setSynced] = useState(false);
   const [sheetSyncing, setSheetSyncing] = useState(false);
   const [sheetMsg, setSheetMsg] = useState(null);
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverDate, setDragOverDate] = useState(null);
+  const [dragOverListId, setDragOverListId] = useState(null);
   const saveTimer = useRef(null);
   const lastSavedJson = useRef("");
   const isRemoteUpdate = useRef(false);
@@ -744,6 +747,26 @@ export default function App() {
   const updatePost = (id, key, val) => setPosts(prev => prev.map(p => p.id === id ? { ...p, [key]: val } : p));
   const deletePost = (id) => { setPosts(prev => prev.filter(p => p.id !== id)); if (selectedId === id) setSelectedId(null); };
 
+  const dropOnDate = (postId, date) => {
+    const fd = fmtDate(date);
+    const pd = new Date(date); pd.setDate(pd.getDate() + 2);
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, foodDate: fd, date: fmtDate(pd) } : p));
+  };
+
+  const dropOnListItem = (draggedId, targetId) => {
+    if (draggedId === targetId) return;
+    setPosts(prev => {
+      const dragged = prev.find(p => p.id === draggedId);
+      const target = prev.find(p => p.id === targetId);
+      if (!dragged || !target) return prev;
+      return prev.map(p => {
+        if (p.id === draggedId) return { ...p, foodDate: target.foodDate, date: target.date };
+        if (p.id === targetId) return { ...p, foodDate: dragged.foodDate, date: dragged.date };
+        return p;
+      });
+    });
+  };
+
   const addPostOnDate = (date) => {
     const newId = Math.max(0, ...posts.map(p => p.id)) + 1;
     setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: "", foodDate: fmtDate(date), ma: "", ma2: "", pa: "", pa2: "", done: false }]);
@@ -859,17 +882,25 @@ export default function App() {
                   const dayPosts = posts.filter(p => sameDay(parseDate(p.foodDate || p.date), date));
                   const isToday = sameDay(date, new Date());
                   const hasPosts = dayPosts.length > 0;
+                  const cellDateStr = fmtDate(date);
+                  const isDragOver = draggingId && dragOverDate === cellDateStr && inMonth;
                   return (
                     <div key={`d-${ri}-${ci}`}
-                      onClick={() => { if (!hasPosts && inMonth) addPostOnDate(date); }}
+                      onClick={() => { if (!hasPosts && inMonth && !draggingId) addPostOnDate(date); }}
+                      onDragOver={e => { if (!inMonth) return; e.preventDefault(); setDragOverDate(cellDateStr); }}
+                      onDragLeave={() => setDragOverDate(null)}
+                      onDrop={e => { e.preventDefault(); if (draggingId && inMonth) { dropOnDate(draggingId, date); } setDraggingId(null); setDragOverDate(null); }}
                       style={{
-                        background: inMonth ? "#fff" : "#f5f5f3", minHeight: 90, padding: "4px 5px",
+                        background: isDragOver ? "#e8f5e9" : inMonth ? "#fff" : "#f5f5f3",
+                        minHeight: 90, padding: "4px 5px",
                         opacity: inMonth ? 1 : 0.35,
                         cursor: (!hasPosts && inMonth) ? "pointer" : "default",
                         transition: "background 0.15s",
+                        outline: isDragOver ? "2px dashed #2E7D32" : "none",
+                        outlineOffset: "-2px",
                       }}
-                      onMouseEnter={e => { if (!hasPosts && inMonth) e.currentTarget.style.background = "#f0fce8"; }}
-                      onMouseLeave={e => { if (!hasPosts && inMonth) e.currentTarget.style.background = "#fff"; }}
+                      onMouseEnter={e => { if (!hasPosts && inMonth && !draggingId) e.currentTarget.style.background = "#f0fce8"; }}
+                      onMouseLeave={e => { if (!isDragOver) e.currentTarget.style.background = inMonth ? "#fff" : "#f5f5f3"; }}
                     >
                       <div style={{
                         fontSize: 11, fontWeight: isToday ? 700 : 500,
@@ -887,11 +918,17 @@ export default function App() {
                         {dayPosts.map(p => {
                           const sc = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#333" };
                           return (
-                            <div key={p.id} style={{
-                              background: sc.bg, borderLeft: `3px solid ${sc.accent}`, borderRadius: 4,
-                              padding: "4px 5px 5px", fontSize: 9, color: sc.accent, fontWeight: 600,
-                              fontFamily: "'DM Sans', sans-serif",
-                            }}>
+                            <div key={p.id}
+                              draggable={true}
+                              onDragStart={e => { e.dataTransfer.effectAllowed = "move"; setDraggingId(p.id); }}
+                              onDragEnd={() => { setDraggingId(null); setDragOverDate(null); }}
+                              style={{
+                                background: sc.bg, borderLeft: `3px solid ${sc.accent}`, borderRadius: 4,
+                                padding: "4px 5px 5px", fontSize: 9, color: sc.accent, fontWeight: 600,
+                                fontFamily: "'DM Sans', sans-serif",
+                                opacity: draggingId === p.id ? 0.4 : 1,
+                                cursor: "grab",
+                              }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 3, marginBottom: 3 }}>
                                 {p.done && <span style={{ color: "#2E7D32", fontWeight: 900, fontSize: 10, flexShrink: 0, lineHeight: 1 }}>✓</span>}
                                 {vendors[p.spot] && (
@@ -940,13 +977,23 @@ export default function App() {
               const c = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#333" };
               const d = parseDate(p.date);
               return (
-                <div key={p.id} onClick={() => setSelectedId(p.id)} style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-                  background: p.done ? "#F1F8E9" : "#fff",
-                  border: `1px solid ${p.done ? "#C8E6C9" : "#eee"}`,
-                  borderLeft: `4px solid ${p.done ? "#2E7D32" : c.accent}`,
-                  borderRadius: 8, cursor: "pointer",
-                }}>
+                <div key={p.id}
+                  draggable={true}
+                  onDragStart={e => { e.dataTransfer.effectAllowed = "move"; setDraggingId(p.id); }}
+                  onDragEnd={() => { setDraggingId(null); setDragOverListId(null); }}
+                  onDragOver={e => { e.preventDefault(); setDragOverListId(p.id); }}
+                  onDragLeave={() => setDragOverListId(null)}
+                  onDrop={e => { e.preventDefault(); if (draggingId) dropOnListItem(draggingId, p.id); setDraggingId(null); setDragOverListId(null); }}
+                  onClick={() => { if (!draggingId) setSelectedId(p.id); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                    background: dragOverListId === p.id ? "#e8f5e9" : p.done ? "#F1F8E9" : "#fff",
+                    border: `1px solid ${dragOverListId === p.id ? "#2E7D32" : p.done ? "#C8E6C9" : "#eee"}`,
+                    borderLeft: `4px solid ${p.done ? "#2E7D32" : c.accent}`,
+                    borderRadius: 8, cursor: draggingId ? "grabbing" : "grab",
+                    opacity: draggingId === p.id ? 0.4 : 1,
+                    transition: "background 0.1s, border-color 0.1s",
+                  }}>
                   <button onClick={(e) => { e.stopPropagation(); updatePost(p.id, "done", !p.done); }} title={p.done ? "Mark undone" : "Mark done"} style={{
                     width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
                     border: `2px solid ${p.done ? "#2E7D32" : "#ccc"}`,
