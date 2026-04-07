@@ -722,7 +722,7 @@ export default function App() {
 
   const addPostOnDate = (date) => {
     const newId = Math.max(0, ...posts.map(p => p.id)) + 1;
-    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: fmtDate(date), foodDate: "", ma: "", ma2: "", pa: "", pa2: "", done: false }]);
+    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: "", foodDate: fmtDate(date), ma: "", ma2: "", pa: "", pa2: "", done: false }]);
     setSelectedId(newId);
   };
 
@@ -730,7 +730,7 @@ export default function App() {
 
   const selectedPost = posts.find(p => p.id === selectedId);
   const calDays = getCalendarDays(2026, currentMonth);
-  const monthPosts = posts.filter(p => parseDate(p.date).getMonth() === currentMonth).sort((a, b) => a.date.localeCompare(b.date));
+  const monthPosts = posts.filter(p => parseDate(p.foodDate || p.date).getMonth() === currentMonth).sort((a, b) => (a.foodDate || a.date).localeCompare(b.foodDate || b.date));
   const months = [3, 4, 5];
   const maCounts = {}; const paCounts = {};
   posts.forEach(p => { maCounts[p.ma] = (maCounts[p.ma]||0)+1; paCounts[p.pa] = (paCounts[p.pa]||0)+1; });
@@ -774,7 +774,7 @@ export default function App() {
             }}>
               {MONTHS[m]}
               <span style={{ background: currentMonth === m ? "rgba(255,255,255,0.2)" : "#ddd", borderRadius: 10, padding: "1px 6px", fontSize: 10, marginLeft: 5 }}>
-                {posts.filter(p => parseDate(p.date).getMonth() === m).length}
+                {posts.filter(p => parseDate(p.foodDate || p.date).getMonth() === m).length}
               </span>
             </button>
           ))}
@@ -832,7 +832,7 @@ export default function App() {
                   </>)}
                 </div>,
                 ...row.map(({ date, inMonth }, ci) => {
-                  const dayPosts = posts.filter(p => sameDay(parseDate(p.date), date));
+                  const dayPosts = posts.filter(p => sameDay(parseDate(p.foodDate || p.date), date));
                   const isToday = sameDay(date, new Date());
                   const hasPosts = dayPosts.length > 0;
                   return (
@@ -882,10 +882,10 @@ export default function App() {
                                   {p.spot === "TBD" ? "TBD" : p.spot.length > 13 ? p.spot.slice(0,11) + "…" : p.spot}
                                 </button>
                               </div>
-                              {p.foodDate && (
+                              {p.date && (
                                 <div style={{ fontSize: 8, color: "#888", fontWeight: 600, marginBottom: 2, display: "flex", alignItems: "center", gap: 2 }}>
-                                  <span style={{ color: "#E65100" }}>🎬</span>
-                                  {(() => { const d = parseDate(p.foodDate); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })()}
+                                  <span>📅</span>
+                                  {(() => { const d = parseDate(p.date); return `Post: ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })()}
                                 </div>
                               )}
                               <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
