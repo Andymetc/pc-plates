@@ -225,7 +225,15 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onVendorClick, vendors }
         <div style={{ display: "flex", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <Label>Record Food Date</Label>
-            <input type="date" value={post.foodDate || ""} onChange={e => update("foodDate", e.target.value)} style={{
+            <input type="date" value={post.foodDate || ""} onChange={e => {
+              const fd = e.target.value;
+              update("foodDate", fd);
+              if (fd) {
+                const d = new Date(fd + "T00:00:00");
+                d.setDate(d.getDate() + 2);
+                update("date", fmtDate(d));
+              }
+            }} style={{
               border: "1px solid #ddd", borderRadius: 6, padding: "6px 8px", fontSize: 12,
               fontFamily: "'DM Sans', sans-serif", width: "100%",
             }} />
