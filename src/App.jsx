@@ -60,35 +60,35 @@ function getWeekFromDate(dateStr) {
 }
 
 const DEFAULT_POSTS = [
-  { id: 1, series: "Breakfast at PC", spot: "Santorini Greek Island Grill", order: "Breakfast burrito", format: "Reel: morning pickup POV", hook: "You have a 9am. You're already at PC. Stop skipping breakfast.", cost: "$8–10", date: "2026-04-01", ma: "Dominik", pa: "Regine" },
-  { id: 2, series: "Cheap Eats", spot: "Curry Up Now", order: "Most affordable bowl or combo", format: "Reel: things you didn't know you could get at PC", hook: "Curry Up Now has a full meal under $10 and nobody talks about it.", cost: "$8–10", date: "2026-04-03", ma: "Isabella", pa: "Nadine" },
-  { id: 3, series: "Breakfast at PC", spot: "Su Pan Bakery", order: "Concha + coffee combo", format: "Reel: cozy pastry close-ups", hook: "A concha and a cortado for less than your parking permit.", cost: "$6–8", date: "2026-04-07", ma: "Siena", pa: "Leira" },
-  { id: 4, series: "Cheap Eats", spot: "Taco Villa", order: "Burrito or plate under $9", format: "Reel: price reveal — guess the total", hook: "Name a better deal at PC. We'll wait.", cost: "$7–9", date: "2026-04-09", ma: "Taniyah", pa: "Tobin" },
-  { id: 5, series: "Desserts & Drinks", spot: "Zanzibar Café at The Loft", order: "Specialty coffee or espresso", format: "Reel: coffee pour shots, study break", hook: "Zanzibar makes real coffee and it's been right here the whole time.", cost: "$5–7", date: "2026-04-11", ma: "Tina", pa: "Jodie" },
-  { id: 6, series: "Cheap Eats", spot: "Tapioca Express", order: "Manager's special (reveal on camera)", format: "Reel: mystery order", hook: "We ordered the manager's special so you don't have to wonder.", cost: "$10–14", date: "2026-04-14", ma: "Yaena", pa: "Aeron" },
-  { id: 7, series: "Breakfast at PC", spot: "Taco Bell", order: "Breakfast Crunchwrap or combo", format: "Reel: speed-run breakfast under $5", hook: "Taco Bell breakfast is criminally underrated and you know it.", cost: "$4–6", date: "2026-04-16", ma: "Jeanette", pa: "Justin" },
-  { id: 8, series: "Desserts & Drinks", spot: "Yogurt World", order: "Custom froyo bowl", format: "Reel: topping build, satisfying swirl shots", hook: "Design your own dessert. It's called self-care.", cost: "$6–8", date: "2026-04-18", ma: "Kaitlyn", pa: "Fuma" },
-  { id: 9, series: "Late Night / Lock In", spot: "Taco Bell", order: "Late-night go-to order", format: "Reel: 10pm Geisel exit, walk to PC", hook: "It's 10pm. You just left Geisel. Taco Bell is still open.", cost: "$6–8", date: "2026-04-21", ma: "Gerardo", pa: "Matthew" },
-  { id: 10, series: "Cheap Eats", spot: "Zanzibar Café at The Loft", order: "Happy hour menu item", format: "Reel: happy hour spotlight, midterm refuel", hook: "Midterm brain needs real food. Zanzibar happy hour. Go.", cost: "$8–12", date: "2026-04-23", ma: "Amber", pa: "Regine" },
-  { id: 11, series: "Desserts & Drinks", spot: "Su Pan Bakery", order: "Coffee + sweet bread for late study", format: "Reel: 8pm pan dulce run, study fuel", hook: "Su Pan coffee and a concha is the midterm survival kit nobody told you about.", cost: "$6–9", date: "2026-04-25", ma: "Jennifer", pa: "Nadine" },
-  { id: 12, series: "Late Night / Lock In", spot: "Subway", order: "Custom sub, late-night build", format: "Reel: building the perfect study sub", hook: "Subway at 9pm hits different when you've been studying since noon.", cost: "$8–10", date: "2026-05-01", ma: "Talia", pa: "Leira" },
-  { id: 13, series: "Cheap Eats", spot: "Croutons", order: "$6.99 Friday panini", format: "Reel: Friday-only deal reveal", hook: "You survived midterms (almost). $6.99 panini. You've earned it.", cost: "$7–8", date: "2026-05-03", ma: "Kiana", pa: "Tobin" },
-  { id: 14, series: "Late Night / Lock In", spot: "Burger King", order: "Late-night value combo", format: "Reel: BK after dark, post-midterm reward", hook: "Midterms are done. Burger King after dark. No judgment zone.", cost: "$6–9", date: "2026-05-05", ma: "Andy", pa: "Jodie" },
-  { id: 15, series: "Breakfast at PC", spot: "Shores Diner", order: "Coffee + breakfast plate", format: "Reel: classic diner morning", hook: "Shores has full diner breakfast energy and you've been walking past it.", cost: "$8–11", date: "2026-05-07", ma: "Leandro", pa: "Aeron" },
-  { id: 16, series: "Cheap Eats", spot: "Dirty Birds", order: "Wings split with a friend ($7 each)", format: "Reel: buddy meal, celebration", hook: "Midterms are over. Grab a friend. Split wings. $7 each.", cost: "$14", date: "2026-05-09", ma: "Amané", pa: "Justin" },
-  { id: 17, series: "Breakfast at PC", spot: "Taco Villa", order: "Breakfast burrito", format: "Reel: breakfast burrito bracket", hook: "Two breakfast burritos enter. One leaves. (Just kidding, eat both.)", cost: "$7–9", date: "2026-05-12", ma: "Dominik", pa: "Fuma" },
-  { id: 18, series: "Desserts & Drinks", spot: "Shores Diner", order: "Coffee + pie or dessert", format: "Reel: afternoon diner vibes", hook: "Shores Diner has pie and nobody ever talks about it.", cost: "$6–8", date: "2026-05-14", ma: "Isabella", pa: "Matthew" },
-  { id: 19, series: "Cheap Eats", spot: "Taco Bell", order: "Value menu meal under $7", format: "Reel: $5 challenge", hook: "We built a full Taco Bell meal for less than your iced latte.", cost: "$5–7", date: "2026-05-19", ma: "Siena", pa: "Regine" },
-  { id: 20, series: "Desserts & Drinks", spot: "Su Pan Bakery", order: "Pan dulce taste test", format: "Reel: ranking every pastry", hook: "Ranking every pastry at Su Pan so you don't have to guess.", cost: "$6–9", date: "2026-05-21", ma: "Taniyah", pa: "Nadine" },
-  { id: 21, series: "Fan Favorites", spot: "TBD", order: "Audience vote — which spot to revisit?", format: "Story poll + carousel recap", hook: "You've seen them all. Now you pick. Vote for our Season Finale.", cost: "$0", date: "2026-05-23", ma: "Tina", pa: "Leira" },
-  { id: 22, series: "Fan Favorites", spot: "TBD", order: "Top voted spot — revisit with new order", format: "Reel: You voted, we ate", hook: "The people spoke. We're back trying something new.", cost: "$10–14", date: "2026-05-27", ma: "Yaena", pa: "Tobin" },
-  { id: 23, series: "Fan Favorites", spot: "TBD", order: "Runner-up spot — different angle", format: "Reel: second chance", hook: "Runner-up round. We owed this spot a second visit.", cost: "$10–14", date: "2026-05-29", ma: "Jeanette", pa: "Jodie" },
-  { id: 24, series: "Late Night / Lock In", spot: "Taco Bell", order: "Late-night finals order + hours", format: "Reel: Finals lock-in starts now", hook: "Finals week is here. Taco Bell is still open. Let's lock in.", cost: "$6–8", date: "2026-06-02", ma: "Kaitlyn", pa: "Aeron" },
-  { id: 25, series: "Late Night / Lock In", spot: "Subway", order: "Custom finals sub build", format: "Reel: Build your finals fuel", hook: "Build the sub. Hit the books. You've got this.", cost: "$8–10", date: "2026-06-04", ma: "Gerardo", pa: "Justin" },
-  { id: 26, series: "Desserts & Drinks", spot: "Zanzibar Café at The Loft", order: "Coffee crawl — caffeine ranking", format: "Reel: Ranking every coffee at PC for finals", hook: "Finals caffeine tier list. You need this.", cost: "$10–14", date: "2026-06-06", ma: "Amber", pa: "Fuma" },
-  { id: 27, series: "Finals Fuel", spot: "Multiple / Roundup", order: "Top cheap eats + caffeine + late night", format: "Carousel: finals survival guide", hook: "Finals fuel guide — every cheap eat, late bite, and caffeine hit at PC.", cost: "$0", date: "2026-06-08", ma: "Jennifer", pa: "Matthew" },
-  { id: 28, series: "Finals Fuel", spot: "Multiple / Roundup", order: "Late-night spots + finals hours", format: "Reel: Still open during finals", hook: "It's finals. These spots are still open. You're welcome.", cost: "$0", date: "2026-06-10", ma: "Talia", pa: "Regine" },
-  { id: 29, series: "Finals Fuel", spot: "Multiple / Roundup", order: "Final post — thank you + summer tease", format: "Reel/Carousel: season wrap", hook: "That's a wrap on PC Plates. Thanks for eating with us.", cost: "$0", date: "2026-06-12", ma: "Kiana", pa: "Nadine" },
+  { id: 1, series: "Breakfast at PC", spot: "Santorini Greek Island Grill", order: "Breakfast burrito", format: "Reel: morning pickup POV", hook: "You have a 9am. You're already at PC. Stop skipping breakfast.", cost: "$8–10", foodDate: "2026-04-01", date: "2026-04-03", ma: "Dominik", pa: "Regine" },
+  { id: 2, series: "Cheap Eats", spot: "Curry Up Now", order: "Most affordable bowl or combo", format: "Reel: things you didn't know you could get at PC", hook: "Curry Up Now has a full meal under $10 and nobody talks about it.", cost: "$8–10", foodDate: "2026-04-03", date: "2026-04-05", ma: "Isabella", pa: "Nadine" },
+  { id: 3, series: "Breakfast at PC", spot: "Su Pan Bakery", order: "Concha + coffee combo", format: "Reel: cozy pastry close-ups", hook: "A concha and a cortado for less than your parking permit.", cost: "$6–8", foodDate: "2026-04-07", date: "2026-04-09", ma: "Siena", pa: "Leira" },
+  { id: 4, series: "Cheap Eats", spot: "Taco Villa", order: "Burrito or plate under $9", format: "Reel: price reveal — guess the total", hook: "Name a better deal at PC. We'll wait.", cost: "$7–9", foodDate: "2026-04-09", date: "2026-04-11", ma: "Taniyah", pa: "Tobin" },
+  { id: 5, series: "Desserts & Drinks", spot: "Zanzibar Café at The Loft", order: "Specialty coffee or espresso", format: "Reel: coffee pour shots, study break", hook: "Zanzibar makes real coffee and it's been right here the whole time.", cost: "$5–7", foodDate: "2026-04-11", date: "2026-04-13", ma: "Tina", pa: "Jodie" },
+  { id: 6, series: "Cheap Eats", spot: "Tapioca Express", order: "Manager's special (reveal on camera)", format: "Reel: mystery order", hook: "We ordered the manager's special so you don't have to wonder.", cost: "$10–14", foodDate: "2026-04-14", date: "2026-04-16", ma: "Yaena", pa: "Aeron" },
+  { id: 7, series: "Breakfast at PC", spot: "Taco Bell", order: "Breakfast Crunchwrap or combo", format: "Reel: speed-run breakfast under $5", hook: "Taco Bell breakfast is criminally underrated and you know it.", cost: "$4–6", foodDate: "2026-04-16", date: "2026-04-18", ma: "Jeanette", pa: "Justin" },
+  { id: 8, series: "Desserts & Drinks", spot: "Yogurt World", order: "Custom froyo bowl", format: "Reel: topping build, satisfying swirl shots", hook: "Design your own dessert. It's called self-care.", cost: "$6–8", foodDate: "2026-04-18", date: "2026-04-20", ma: "Kaitlyn", pa: "Fuma" },
+  { id: 9, series: "Late Night / Lock In", spot: "Taco Bell", order: "Late-night go-to order", format: "Reel: 10pm Geisel exit, walk to PC", hook: "It's 10pm. You just left Geisel. Taco Bell is still open.", cost: "$6–8", foodDate: "2026-04-21", date: "2026-04-23", ma: "Gerardo", pa: "Matthew" },
+  { id: 10, series: "Cheap Eats", spot: "Zanzibar Café at The Loft", order: "Happy hour menu item", format: "Reel: happy hour spotlight, midterm refuel", hook: "Midterm brain needs real food. Zanzibar happy hour. Go.", cost: "$8–12", foodDate: "2026-04-23", date: "2026-04-25", ma: "Amber", pa: "Regine" },
+  { id: 11, series: "Desserts & Drinks", spot: "Su Pan Bakery", order: "Coffee + sweet bread for late study", format: "Reel: 8pm pan dulce run, study fuel", hook: "Su Pan coffee and a concha is the midterm survival kit nobody told you about.", cost: "$6–9", foodDate: "2026-04-25", date: "2026-04-27", ma: "Jennifer", pa: "Nadine" },
+  { id: 12, series: "Late Night / Lock In", spot: "Subway", order: "Custom sub, late-night build", format: "Reel: building the perfect study sub", hook: "Subway at 9pm hits different when you've been studying since noon.", cost: "$8–10", foodDate: "2026-05-01", date: "2026-05-03", ma: "Talia", pa: "Leira" },
+  { id: 13, series: "Cheap Eats", spot: "Croutons", order: "$6.99 Friday panini", format: "Reel: Friday-only deal reveal", hook: "You survived midterms (almost). $6.99 panini. You've earned it.", cost: "$7–8", foodDate: "2026-05-03", date: "2026-05-05", ma: "Kiana", pa: "Tobin" },
+  { id: 14, series: "Late Night / Lock In", spot: "Burger King", order: "Late-night value combo", format: "Reel: BK after dark, post-midterm reward", hook: "Midterms are done. Burger King after dark. No judgment zone.", cost: "$6–9", foodDate: "2026-05-05", date: "2026-05-07", ma: "Andy", pa: "Jodie" },
+  { id: 15, series: "Breakfast at PC", spot: "Shores Diner", order: "Coffee + breakfast plate", format: "Reel: classic diner morning", hook: "Shores has full diner breakfast energy and you've been walking past it.", cost: "$8–11", foodDate: "2026-05-07", date: "2026-05-09", ma: "Leandro", pa: "Aeron" },
+  { id: 16, series: "Cheap Eats", spot: "Dirty Birds", order: "Wings split with a friend ($7 each)", format: "Reel: buddy meal, celebration", hook: "Midterms are over. Grab a friend. Split wings. $7 each.", cost: "$14", foodDate: "2026-05-09", date: "2026-05-11", ma: "Amané", pa: "Justin" },
+  { id: 17, series: "Breakfast at PC", spot: "Taco Villa", order: "Breakfast burrito", format: "Reel: breakfast burrito bracket", hook: "Two breakfast burritos enter. One leaves. (Just kidding, eat both.)", cost: "$7–9", foodDate: "2026-05-12", date: "2026-05-14", ma: "Dominik", pa: "Fuma" },
+  { id: 18, series: "Desserts & Drinks", spot: "Shores Diner", order: "Coffee + pie or dessert", format: "Reel: afternoon diner vibes", hook: "Shores Diner has pie and nobody ever talks about it.", cost: "$6–8", foodDate: "2026-05-14", date: "2026-05-16", ma: "Isabella", pa: "Matthew" },
+  { id: 19, series: "Cheap Eats", spot: "Taco Bell", order: "Value menu meal under $7", format: "Reel: $5 challenge", hook: "We built a full Taco Bell meal for less than your iced latte.", cost: "$5–7", foodDate: "2026-05-19", date: "2026-05-21", ma: "Siena", pa: "Regine" },
+  { id: 20, series: "Desserts & Drinks", spot: "Su Pan Bakery", order: "Pan dulce taste test", format: "Reel: ranking every pastry", hook: "Ranking every pastry at Su Pan so you don't have to guess.", cost: "$6–9", foodDate: "2026-05-21", date: "2026-05-23", ma: "Taniyah", pa: "Nadine" },
+  { id: 21, series: "Fan Favorites", spot: "TBD", order: "Audience vote — which spot to revisit?", format: "Story poll + carousel recap", hook: "You've seen them all. Now you pick. Vote for our Season Finale.", cost: "$0", foodDate: "2026-05-23", date: "2026-05-25", ma: "Tina", pa: "Leira" },
+  { id: 22, series: "Fan Favorites", spot: "TBD", order: "Top voted spot — revisit with new order", format: "Reel: You voted, we ate", hook: "The people spoke. We're back trying something new.", cost: "$10–14", foodDate: "2026-05-27", date: "2026-05-29", ma: "Yaena", pa: "Tobin" },
+  { id: 23, series: "Fan Favorites", spot: "TBD", order: "Runner-up spot — different angle", format: "Reel: second chance", hook: "Runner-up round. We owed this spot a second visit.", cost: "$10–14", foodDate: "2026-05-29", date: "2026-05-31", ma: "Jeanette", pa: "Jodie" },
+  { id: 24, series: "Late Night / Lock In", spot: "Taco Bell", order: "Late-night finals order + hours", format: "Reel: Finals lock-in starts now", hook: "Finals week is here. Taco Bell is still open. Let's lock in.", cost: "$6–8", foodDate: "2026-06-02", date: "2026-06-04", ma: "Kaitlyn", pa: "Aeron" },
+  { id: 25, series: "Late Night / Lock In", spot: "Subway", order: "Custom finals sub build", format: "Reel: Build your finals fuel", hook: "Build the sub. Hit the books. You've got this.", cost: "$8–10", foodDate: "2026-06-04", date: "2026-06-06", ma: "Gerardo", pa: "Justin" },
+  { id: 26, series: "Desserts & Drinks", spot: "Zanzibar Café at The Loft", order: "Coffee crawl — caffeine ranking", format: "Reel: Ranking every coffee at PC for finals", hook: "Finals caffeine tier list. You need this.", cost: "$10–14", foodDate: "2026-06-06", date: "2026-06-08", ma: "Amber", pa: "Fuma" },
+  { id: 27, series: "Finals Fuel", spot: "Multiple / Roundup", order: "Top cheap eats + caffeine + late night", format: "Carousel: finals survival guide", hook: "Finals fuel guide — every cheap eat, late bite, and caffeine hit at PC.", cost: "$0", foodDate: "2026-06-08", date: "2026-06-10", ma: "Jennifer", pa: "Matthew" },
+  { id: 28, series: "Finals Fuel", spot: "Multiple / Roundup", order: "Late-night spots + finals hours", format: "Reel: Still open during finals", hook: "It's finals. These spots are still open. You're welcome.", cost: "$0", foodDate: "2026-06-10", date: "2026-06-12", ma: "Talia", pa: "Regine" },
+  { id: 29, series: "Finals Fuel", spot: "Multiple / Roundup", order: "Final post — thank you + summer tease", format: "Reel/Carousel: season wrap", hook: "That's a wrap on PC Plates. Thanks for eating with us.", cost: "$0", foodDate: "2026-06-12", date: "2026-06-14", ma: "Kiana", pa: "Nadine" },
 ];
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -592,6 +592,20 @@ function pushToSheet(type, data) {
   }).catch(() => {}); // ignore errors — sheet sync is best-effort
 }
 
+function migrateFoodDates(posts) {
+  let changed = false;
+  const migrated = posts.map(p => {
+    if (!p.foodDate && p.date) {
+      changed = true;
+      const pd = parseDate(p.date);
+      pd.setDate(pd.getDate() + 2);
+      return { ...p, foodDate: p.date, date: fmtDate(pd) };
+    }
+    return p;
+  });
+  return { migrated, changed };
+}
+
 // ─── MAIN APP ───
 
 export default function App() {
@@ -612,8 +626,10 @@ export default function App() {
   useEffect(() => {
     fetchPosts().then((data) => {
       if (data) {
-        setPosts(data);
-        lastSavedJson.current = JSON.stringify(data);
+        const { migrated, changed } = migrateFoodDates(data);
+        setPosts(migrated);
+        lastSavedJson.current = JSON.stringify(migrated);
+        if (changed) savePosts(migrated);
       } else {
         savePosts(DEFAULT_POSTS).then(() => {
           lastSavedJson.current = JSON.stringify(DEFAULT_POSTS);
