@@ -9,6 +9,7 @@ const SERIES_COLORS = {
   "Desserts & Drinks": { bg: "#FCE4EC", accent: "#C62828" },
   "Fan Favorites": { bg: "#F3E5F5", accent: "#6A1B9A" },
   "Finals Fuel": { bg: "#FFF9C4", accent: "#F57F17" },
+  "Campus Bites": { bg: "#E0F7FA", accent: "#00838F" },
 };
 const SERIES_LIST = Object.keys(SERIES_COLORS);
 
