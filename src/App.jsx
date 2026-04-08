@@ -746,6 +746,10 @@ export default function App() {
   const [filterPerson, setFilterPerson] = useState("");
   const [undoStack, setUndoStack] = useState(null); // { posts, msg }
   const [creatingVendor, setCreatingVendor] = useState(false);
+  const [currentWeekSun, setCurrentWeekSun] = useState(() => {
+    const today = new Date(); const d = new Date(today);
+    d.setDate(today.getDate() - today.getDay()); d.setHours(0,0,0,0); return d;
+  });
   const undoTimer = useRef(null);
   const saveTimer = useRef(null);
   const lastSavedJson = useRef("");
@@ -1020,11 +1024,16 @@ export default function App() {
             </button>
           ))}
           <div style={{ flex: 1 }} />
-          <button onClick={() => { setCurrentMonth(new Date().getMonth()); setView("calendar"); }} title="Jump to today" style={{
+          <button onClick={() => {
+            const today = new Date(); const sun = new Date(today);
+            sun.setDate(today.getDate() - today.getDay()); sun.setHours(0,0,0,0);
+            if (view === "week") { setCurrentWeekSun(sun); }
+            else { setCurrentMonth(today.getMonth()); setView("calendar"); }
+          }} title="Jump to today" style={{
             padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer",
             fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, background: "#fff", color: "#555",
           }}>Today</button>
-          {["calendar", "list", "vendors", "overview"].map(v => (
+          {["calendar", "week", "list", "vendors", "overview"].map(v => (
             <button key={v} onClick={() => setView(v)} style={{
               padding: "6px 14px", borderRadius: 8, cursor: "pointer",
               fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600,
@@ -1032,7 +1041,7 @@ export default function App() {
               background: view === v ? "#1a1a2e" : "#fff",
               color: view === v ? "#fff" : "#555",
             }}>
-              {v === "calendar" ? "📅 Calendar" : v === "list" ? "📋 List" : v === "vendors" ? "🏪 Vendors" : "📊 Overview"}
+              {v === "calendar" ? "📅 Calendar" : v === "week" ? "📆 Week" : v === "list" ? "📋 List" : v === "vendors" ? "🏪 Vendors" : "📊 Overview"}
             </button>
           ))}
         </div>
@@ -1202,6 +1211,83 @@ export default function App() {
         </div>
       )}
 
+      {/* WEEK VIEW */}
+      {view === "week" && (() => {
+        const days = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(currentWeekSun); d.setDate(currentWeekSun.getDate() + i); return d;
+        });
+        const wk = getWeekLabel(currentWeekSun);
+        const weekLabel = wk ? (wk.label === "FINALS" ? "Finals Week" : `${wk.label}${wk.isMidterm ? " · Midterm" : wk.isFinals ? " · Finals" : ""}`) : null;
+        const goWeek = (delta) => { const d = new Date(currentWeekSun); d.setDate(d.getDate() + delta * 7); setCurrentWeekSun(d); };
+        return (
+          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <button onClick={() => goWeek(-1)} style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: 16, color: "#555" }}>‹</button>
+              <div style={{ flex: 1, textAlign: "center" }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>
+                  {MONTHS[currentWeekSun.getMonth()]} {currentWeekSun.getDate()} – {MONTHS[days[6].getMonth()]} {days[6].getDate()}, {days[6].getFullYear()}
+                </span>
+                {weekLabel && <span style={{ marginLeft: 8, fontSize: 11, color: "#999", fontWeight: 500 }}>{weekLabel}</span>}
+              </div>
+              <button onClick={() => goWeek(1)} style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: 16, color: "#555" }}>›</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8, alignItems: "start" }}>
+              {days.map(date => {
+                const ds = fmtDate(date);
+                const dayPosts = posts.filter(p => (p.foodDate || p.date) === ds);
+                const filteredDayPosts = applyFilters(dayPosts);
+                const isToday = sameDay(date, new Date());
+                return (
+                  <div key={ds} style={{ background: "#fff", borderRadius: 10, overflow: "hidden", border: isToday ? `2px solid #E65100` : "1px solid #eee", minHeight: 100 }}>
+                    <div style={{ padding: "8px 10px 6px", background: isToday ? "#E65100" : "#f7f7f5", borderBottom: "1px solid #f0f0ee" }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: isToday ? "rgba(255,255,255,0.75)" : "#aaa", textTransform: "uppercase", letterSpacing: 1 }}>{DAYS_SHORT[date.getDay()]}</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: isToday ? "#fff" : "#1a1a2e", lineHeight: 1.2 }}>{date.getDate()}</div>
+                    </div>
+                    <div style={{ padding: 6, display: "flex", flexDirection: "column", gap: 6 }}>
+                      {dayPosts.map(p => {
+                        const sc = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#333" };
+                        const st = STATUS_COLORS[p.status || "idea"];
+                        const isFiltered = (filterSeries || filterPerson) && !filteredDayPosts.includes(p);
+                        return (
+                          <div key={p.id} onClick={() => setSelectedId(p.id)} style={{
+                            background: sc.bg, borderRadius: 8, padding: "8px 10px",
+                            borderLeft: `3px solid ${sc.accent}`, cursor: "pointer",
+                            opacity: isFiltered ? 0.2 : 1,
+                          }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: sc.accent, marginBottom: 2 }}>{p.spot}</div>
+                            <div style={{ fontSize: 9, color: "#888", marginBottom: 4 }}>{p.series}</div>
+                            {p.hook && <div style={{ fontSize: 10, color: "#444", lineHeight: 1.4, marginBottom: 5 }}>{p.hook}</div>}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 3, background: st.bg, borderRadius: 99, padding: "2px 7px" }}>
+                                <div style={{ width: 5, height: 5, borderRadius: "50%", background: st.dot }} />
+                                <span style={{ fontSize: 9, color: st.text, fontWeight: 700, textTransform: "capitalize" }}>{p.status || "idea"}</span>
+                              </div>
+                              {p.date && <span style={{ fontSize: 9, color: "#bbb" }}>📅 {p.date.slice(5)}</span>}
+                            </div>
+                            {(p.ma || p.pa) && (
+                              <div style={{ display: "flex", gap: 4, marginTop: 5, flexWrap: "wrap" }}>
+                                {[p.ma, p.ma2, p.pa, p.pa2].filter(Boolean).map((name, i) => {
+                                  const color = MA_COLORS[name] || PA_COLORS[name] || "#999";
+                                  return <div key={i} title={name} style={{ width: 16, height: 16, borderRadius: "50%", background: color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700 }}>{name.charAt(0)}</div>;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <div onClick={() => addPostOnDate(date)} style={{
+                        border: "1px dashed #ddd", borderRadius: 8, padding: "6px", textAlign: "center",
+                        color: "#ccc", cursor: "pointer", fontSize: 16, lineHeight: 1,
+                      }}>+</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* LIST VIEW */}
       {view === "list" && (
         <div style={{ maxWidth: 1000, margin: "0 auto" }}>
@@ -1363,7 +1449,11 @@ export default function App() {
             <div style={{ fontSize: 10, fontWeight: 700, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Marketing Assistants</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {MAs.map(n => (
-                <div key={n} style={{ display: "flex", alignItems: "center", gap: 6, background: "#f8f8f6", borderRadius: 8, padding: "5px 10px 5px 6px" }}>
+                <div key={n} onClick={() => setFilterPerson(filterPerson === n ? "" : n)} style={{
+                  display: "flex", alignItems: "center", gap: 6, borderRadius: 8, padding: "5px 10px 5px 6px", cursor: "pointer",
+                  background: filterPerson === n ? MA_COLORS[n] + "18" : "#f8f8f6",
+                  border: filterPerson === n ? `1px solid ${MA_COLORS[n]}60` : "1px solid transparent",
+                }}>
                   <div style={{ width: 20, height: 20, borderRadius: "50%", background: MA_COLORS[n], color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>{n.charAt(0)}</div>
                   <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1a2e" }}>{n}</span>
                   <span style={{ background: MA_COLORS[n], color: "#fff", borderRadius: 8, padding: "0 6px", fontSize: 9, fontWeight: 700 }}>{maCounts[n]||0}</span>
@@ -1375,7 +1465,11 @@ export default function App() {
             <div style={{ fontSize: 10, fontWeight: 700, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Photography Assistants</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {PAs.map(n => (
-                <div key={n} style={{ display: "flex", alignItems: "center", gap: 6, background: "#f8f8f6", borderRadius: 8, padding: "5px 10px 5px 6px" }}>
+                <div key={n} onClick={() => setFilterPerson(filterPerson === n ? "" : n)} style={{
+                  display: "flex", alignItems: "center", gap: 6, borderRadius: 8, padding: "5px 10px 5px 6px", cursor: "pointer",
+                  background: filterPerson === n ? PA_COLORS[n] + "18" : "#f8f8f6",
+                  border: filterPerson === n ? `1px solid ${PA_COLORS[n]}60` : "1px solid transparent",
+                }}>
                   <div style={{ width: 20, height: 20, borderRadius: "50%", background: PA_COLORS[n], color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>{n.charAt(0)}</div>
                   <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1a2e" }}>{n}</span>
                   <span style={{ background: PA_COLORS[n], color: "#fff", borderRadius: 8, padding: "0 6px", fontSize: 9, fontWeight: 700 }}>{paCounts[n]||0}</span>
