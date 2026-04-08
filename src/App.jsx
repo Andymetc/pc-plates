@@ -756,6 +756,8 @@ export default function App() {
   });
   const [compact, setCompact] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const undoTimer = useRef(null);
   const saveTimer = useRef(null);
   const lastSavedJson = useRef("");
@@ -858,7 +860,7 @@ export default function App() {
       if (e.key === "Escape") {
         if (activeVendor) { setActiveVendor(null); setCreatingVendor(false); }
         else if (selectedId) setSelectedId(null);
-        else if (filterSeries || filterPerson) { setFilterSeries(""); setFilterPerson(""); }
+        else if (filterSeries || filterPerson || filterStatus || searchQuery) { setFilterSeries(""); setFilterPerson(""); setFilterStatus(""); setSearchQuery(""); }
       }
       if (e.key === "ArrowLeft") {
         if (view === "week") { setCurrentWeekSun(d => { const n = new Date(d); n.setDate(d.getDate() - 7); return n; }); }
@@ -871,7 +873,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeVendor, selectedId, filterSeries, filterPerson, view]);
+  }, [activeVendor, selectedId, filterSeries, filterPerson, filterStatus, searchQuery, view]);
 
   const updateVendor = (name, data) => {
     const next = { ...vendors, [name]: data };
@@ -984,6 +986,12 @@ export default function App() {
   const applyFilters = (list) => list.filter(p => {
     if (filterSeries && p.series !== filterSeries) return false;
     if (filterPerson && p.ma !== filterPerson && p.ma2 !== filterPerson && p.pa !== filterPerson && p.pa2 !== filterPerson) return false;
+    if (filterStatus && normalizeStatus(p.status) !== filterStatus) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const fields = [p.spot, p.series, p.hook, p.order, p.notes, p.ma, p.ma2, p.pa, p.pa2].filter(Boolean);
+      if (!fields.some(f => f.toLowerCase().includes(q))) return false;
+    }
     return true;
   });
 
@@ -1039,9 +1047,26 @@ export default function App() {
             }}>{darkMode ? "☀️" : "🌙"}</button>
           </div>
         </div>
-        <p style={{ fontSize: 12, color: "#777", margin: "4px 0 12px" }}>
-          {posts.length} posts · Click a post to edit · Click an empty date to add · Changes sync live for everyone
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "4px 0 12px", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "#777" }}>{posts.length} posts · Click to edit · Click empty date to add</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            {STATUS_OPTIONS.map(s => {
+              const sc = STATUS_COLORS[s];
+              const count = posts.filter(p => normalizeStatus(p.status) === s).length;
+              const active = filterStatus === s;
+              return (
+                <div key={s} onClick={() => setFilterStatus(active ? "" : s)} style={{
+                  display: "flex", alignItems: "center", gap: 4, background: active ? sc.bg : "transparent",
+                  borderRadius: 99, padding: "2px 8px", cursor: "pointer",
+                  border: `1px solid ${active ? sc.dot : "#ddd"}`,
+                }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} />
+                  <span style={{ fontSize: 10, color: sc.text, fontWeight: 700, textTransform: "capitalize" }}>{count} {s}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
           {months.map(m => (
@@ -1100,6 +1125,22 @@ export default function App() {
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <span style={{ position: "absolute", left: 9, fontSize: 12, color: "#bbb", pointerEvents: "none" }}>🔍</span>
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search posts…"
+              style={{
+                border: "1px solid #ddd", borderRadius: 8, padding: "5px 10px 5px 28px", fontSize: 11,
+                fontFamily: "'DM Sans', sans-serif", background: searchQuery ? "#f0f4ff" : "#fff",
+                color: "#1a1a2e", width: 160, outline: "none",
+              }}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: 6, background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#aaa", padding: 0, lineHeight: 1 }}>×</button>
+            )}
+          </div>
           <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} style={{
             border: "1px solid #ddd", borderRadius: 8, padding: "5px 10px", fontSize: 11,
             fontFamily: "'DM Sans', sans-serif", background: filterPerson ? "#1a1a2e" : "#fff",
@@ -1109,13 +1150,13 @@ export default function App() {
             <optgroup label="MAs">{MAs.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>
             <optgroup label="PAs">{PAs.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>
           </select>
-          {(filterSeries || filterPerson) && (
-            <button onClick={() => { setFilterSeries(""); setFilterPerson(""); }} style={{
+          {(filterSeries || filterPerson || filterStatus || searchQuery) && (
+            <button onClick={() => { setFilterSeries(""); setFilterPerson(""); setFilterStatus(""); setSearchQuery(""); }} style={{
               fontSize: 11, padding: "5px 10px", borderRadius: 8, border: "1px solid #ddd",
               background: "#fff", color: "#999", cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-            }}>✕ Clear filters</button>
+            }}>✕ Clear all</button>
           )}
-          {(filterSeries || filterPerson) && (
+          {(filterSeries || filterPerson || filterStatus || searchQuery) && (
             <span style={{ fontSize: 11, color: "#555" }}>
               {applyFilters(posts).length} of {posts.length} posts
             </span>
