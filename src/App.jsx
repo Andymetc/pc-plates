@@ -181,7 +181,7 @@ function Label({ children }) {
   return <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#999", marginBottom: 4, fontWeight: 600 }}>{children}</div>;
 }
 
-function EditPanel({ post, onClose, onUpdate, onDelete, onVendorClick, vendors }) {
+function EditPanel({ post, onClose, onUpdate, onDelete, onDuplicate, onVendorClick, vendors }) {
   if (!post) return null;
   const c = SERIES_COLORS[post.series] || { bg: "#f5f5f5", accent: "#333" };
   const update = (key, val) => onUpdate(post.id, key, val);
@@ -289,8 +289,18 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onVendorClick, vendors }
         </div>
         <div><Label>What to Order</Label><EditableText value={post.order} onChange={v => update("order", v)} /></div>
         <div><Label>Content Format</Label><EditableText value={post.format} onChange={v => update("format", v)} /></div>
-        <div><Label>Caption Hook</Label><EditableText value={post.hook} onChange={v => update("hook", v)} multiline /></div>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+            <Label>Caption Hook</Label>
+            <span style={{ fontSize: 10, color: (post.hook||"").length > 2000 ? "#e53935" : "#aaa" }}>{(post.hook||"").length}/2200</span>
+          </div>
+          <EditableText value={post.hook} onChange={v => update("hook", v)} multiline />
+        </div>
         <div><Label>Est. Budget</Label><EditableText value={post.cost} onChange={v => update("cost", v)} /></div>
+        <div>
+          <Label>Instagram URL</Label>
+          <EditableText value={post.igUrl || ""} onChange={v => update("igUrl", v)} style={{ fontSize: 11 }} />
+        </div>
         <div><Label>Notes</Label><EditableText value={post.notes || ""} onChange={v => update("notes", v)} multiline style={{ minHeight: 48 }} /></div>
         {vendors && vendors[post.spot]?.website && (
           <a href={vendors[post.spot].website} target="_blank" rel="noreferrer" style={{
@@ -298,11 +308,18 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onVendorClick, vendors }
             textDecoration: "none", fontWeight: 600,
           }}>🔗 {post.spot} website</a>
         )}
-        <button onClick={() => { onDelete(post.id); onClose(); }} style={{
-          width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #e53935",
-          background: "#fff", color: "#e53935", fontWeight: 600, fontSize: 12, cursor: "pointer",
-          fontFamily: "'DM Sans', sans-serif", marginTop: 4,
-        }}>Delete This Post</button>
+        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          <button onClick={() => { onDuplicate(post); onClose(); }} style={{
+            flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #ddd",
+            background: "#fff", color: "#555", fontWeight: 600, fontSize: 12, cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif",
+          }}>⧉ Duplicate</button>
+          <button onClick={() => { onDelete(post.id); onClose(); }} style={{
+            flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #e53935",
+            background: "#fff", color: "#e53935", fontWeight: 600, fontSize: 12, cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif",
+          }}>Delete</button>
+        </div>
       </div>
     </div>
   );
@@ -667,6 +684,8 @@ export default function App() {
   const [dragOverListId, setDragOverListId] = useState(null);
   const [filterSeries, setFilterSeries] = useState("");
   const [filterPerson, setFilterPerson] = useState("");
+  const [undoStack, setUndoStack] = useState(null); // { posts, msg }
+  const undoTimer = useRef(null);
   const saveTimer = useRef(null);
   const lastSavedJson = useRef("");
   const isRemoteUpdate = useRef(false);
@@ -791,7 +810,32 @@ export default function App() {
   };
 
   const updatePost = (id, key, val) => setPosts(prev => prev.map(p => p.id === id ? { ...p, [key]: val } : p));
-  const deletePost = (id) => { setPosts(prev => prev.filter(p => p.id !== id)); if (selectedId === id) setSelectedId(null); };
+
+  const deletePost = (id) => {
+    const snapshot = posts;
+    const deleted = posts.find(p => p.id === id);
+    setPosts(prev => prev.filter(p => p.id !== id));
+    if (selectedId === id) setSelectedId(null);
+    clearTimeout(undoTimer.current);
+    setUndoStack({ posts: snapshot, msg: `Deleted "${deleted?.spot || "post"}"` });
+    undoTimer.current = setTimeout(() => setUndoStack(null), 6000);
+  };
+
+  const undo = () => {
+    if (!undoStack) return;
+    setPosts(undoStack.posts);
+    clearTimeout(undoTimer.current);
+    setUndoStack(null);
+  };
+
+  const duplicatePost = (post) => {
+    const newId = Math.max(0, ...posts.map(p => p.id)) + 1;
+    const fd = post.foodDate || post.date;
+    const pd = fd ? (() => { const d = new Date(fd + "T00:00:00"); d.setDate(d.getDate() + 2); return fmtDate(d); })() : post.date;
+    const clone = { ...post, id: newId, foodDate: fd, date: pd, done: false, status: "idea", notes: "" };
+    setPosts(prev => [...prev, clone]);
+    setSelectedId(newId);
+  };
 
   const dropOnDate = (postId, date) => {
     const fd = fmtDate(date);
@@ -895,7 +939,11 @@ export default function App() {
             </button>
           ))}
           <div style={{ flex: 1 }} />
-          {["calendar", "list", "vendors"].map(v => (
+          <button onClick={() => { setCurrentMonth(new Date().getMonth()); setView("calendar"); }} title="Jump to today" style={{
+            padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, background: "#fff", color: "#555",
+          }}>Today</button>
+          {["calendar", "list", "vendors", "overview"].map(v => (
             <button key={v} onClick={() => setView(v)} style={{
               padding: "6px 14px", borderRadius: 8, cursor: "pointer",
               fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600,
@@ -903,7 +951,7 @@ export default function App() {
               background: view === v ? "#1a1a2e" : "#fff",
               color: view === v ? "#fff" : "#555",
             }}>
-              {v === "calendar" ? "📅 Calendar" : v === "list" ? "📋 List" : "🏪 Vendors"}
+              {v === "calendar" ? "📅 Calendar" : v === "list" ? "📋 List" : v === "vendors" ? "🏪 Vendors" : "📊 Overview"}
             </button>
           ))}
         </div>
@@ -1253,8 +1301,112 @@ export default function App() {
         </div>
       </div>
 
+      {/* OVERVIEW VIEW */}
+      {view === "overview" && (() => {
+        const done = posts.filter(p => p.status === "posted" || p.done).length;
+        const byStatus = {};
+        STATUS_OPTIONS.forEach(s => { byStatus[s] = posts.filter(p => (p.status || "idea") === s).length; });
+        const bySeries = {};
+        SERIES_LIST.forEach(s => { bySeries[s] = { total: 0, done: 0 }; });
+        posts.forEach(p => {
+          if (!bySeries[p.series]) bySeries[p.series] = { total: 0, done: 0 };
+          bySeries[p.series].total++;
+          if (p.status === "posted" || p.done) bySeries[p.series].done++;
+        });
+        const maLoad = {}; const paLoad = {};
+        posts.forEach(p => {
+          [p.ma, p.ma2].filter(Boolean).forEach(n => { maLoad[n] = (maLoad[n]||0)+1; });
+          [p.pa, p.pa2].filter(Boolean).forEach(n => { paLoad[n] = (paLoad[n]||0)+1; });
+        });
+        return (
+          <div style={{ maxWidth: 1000, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+            {/* Progress bar */}
+            <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e" }}>Quarter Progress</span>
+                <span style={{ fontSize: 13, color: "#2E7D32", fontWeight: 700 }}>{done} / {posts.length} posted</span>
+              </div>
+              <div style={{ background: "#f0f0ee", borderRadius: 8, height: 10, overflow: "hidden" }}>
+                <div style={{ width: `${(done/posts.length)*100}%`, background: "#2E7D32", height: "100%", borderRadius: 8, transition: "width 0.4s" }} />
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+                {STATUS_OPTIONS.map(s => { const sc = STATUS_COLORS[s]; return byStatus[s] > 0 && (
+                  <div key={s} style={{ display: "flex", alignItems: "center", gap: 5, background: sc.bg, borderRadius: 20, padding: "4px 10px" }}>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} />
+                    <span style={{ fontSize: 11, color: sc.text, fontWeight: 700, textTransform: "capitalize" }}>{s}</span>
+                    <span style={{ fontSize: 11, color: sc.text, fontWeight: 700 }}>{byStatus[s]}</span>
+                  </div>
+                ); })}
+              </div>
+            </div>
+            {/* Series breakdown */}
+            <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>By Series</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {SERIES_LIST.map(s => {
+                  const sc = SERIES_COLORS[s]; const d = bySeries[s] || { total: 0, done: 0 };
+                  if (!d.total) return null;
+                  return (
+                    <div key={s}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: sc.accent }}>{s}</span>
+                        <span style={{ fontSize: 11, color: "#999" }}>{d.done}/{d.total}</span>
+                      </div>
+                      <div style={{ background: sc.bg, borderRadius: 6, height: 7, overflow: "hidden" }}>
+                        <div style={{ width: d.total ? `${(d.done/d.total)*100}%` : "0%", background: sc.accent, height: "100%", borderRadius: 6 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Team workload */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {[["Marketing Assistants", maLoad, MA_COLORS], ["Photography Assistants", paLoad, PA_COLORS]].map(([title, load, colors]) => (
+                <div key={title} style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>{title}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {Object.entries(load).sort((a,b) => b[1]-a[1]).map(([name, count]) => (
+                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 24, height: 24, borderRadius: "50%", background: colors[name]||"#999", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{name.charAt(0)}</div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a2e", flex: 1 }}>{name}</span>
+                        <div style={{ width: 80, background: "#f0f0ee", borderRadius: 4, height: 6, overflow: "hidden" }}>
+                          <div style={{ width: `${(count/Math.max(...Object.values(load)))*100}%`, background: colors[name]||"#999", height: "100%" }} />
+                        </div>
+                        <span style={{ fontSize: 11, color: "#999", fontWeight: 600, minWidth: 16, textAlign: "right" }}>{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* UNDO TOAST */}
+      {undoStack && (
+        <div style={{
+          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          background: "#1a1a2e", color: "#fff", borderRadius: 12, padding: "12px 20px",
+          display: "flex", alignItems: "center", gap: 14, zIndex: 300,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.25)", fontFamily: "'DM Sans', sans-serif",
+          animation: "slideIn 0.2s ease-out",
+        }}>
+          <span style={{ fontSize: 13 }}>{undoStack.msg}</span>
+          <button onClick={undo} style={{
+            background: "#fff", color: "#1a1a2e", border: "none", borderRadius: 8,
+            padding: "5px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif",
+          }}>Undo</button>
+          <button onClick={() => setUndoStack(null)} style={{
+            background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 16, padding: 0,
+          }}>×</button>
+        </div>
+      )}
+
       {selectedPost && !activeVendor && <div onClick={() => setSelectedId(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.3)", zIndex: 99 }} />}
-      <EditPanel post={selectedPost} onClose={() => setSelectedId(null)} onUpdate={updatePost} onDelete={deletePost} onVendorClick={setActiveVendor} vendors={vendors} />
+      <EditPanel post={selectedPost} onClose={() => setSelectedId(null)} onUpdate={updatePost} onDelete={deletePost} onDuplicate={duplicatePost} onVendorClick={setActiveVendor} vendors={vendors} />
       {activeVendor && <VendorPanel vendor={activeVendor} vendorData={vendors[activeVendor]} onClose={() => setActiveVendor(null)} onUpdate={(data) => updateVendor(activeVendor, data)} />}
     </div>
   );
