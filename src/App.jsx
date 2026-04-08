@@ -13,6 +13,15 @@ const SERIES_COLORS = {
 };
 const SERIES_LIST = Object.keys(SERIES_COLORS);
 
+const STATUS_OPTIONS = ["idea", "scheduled", "recorded", "editing", "posted"];
+const STATUS_COLORS = {
+  idea:       { bg: "#f5f5f5", text: "#999",    dot: "#ccc" },
+  scheduled:  { bg: "#E3F2FD", text: "#1565C0", dot: "#1565C0" },
+  recorded:   { bg: "#FFF3E0", text: "#E65100", dot: "#E65100" },
+  editing:    { bg: "#F3E5F5", text: "#6A1B9A", dot: "#6A1B9A" },
+  posted:     { bg: "#E8F5E9", text: "#2E7D32", dot: "#2E7D32" },
+};
+
 
 const MA_COLORS = {
   "Amber": "#E67E22", "Amané": "#8E44AD", "Andy": "#2C3E50", "Dominik": "#C0392B",
@@ -261,10 +270,49 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onVendorClick, vendors }
             )}
           </div>
         </div>
+        <div>
+          <Label>Status</Label>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {STATUS_OPTIONS.map(s => {
+              const sc = STATUS_COLORS[s];
+              const active = (post.status || "idea") === s;
+              return (
+                <button key={s} onClick={() => update("status", s)} style={{
+                  padding: "4px 10px", borderRadius: 20, border: `1px solid ${active ? sc.dot : "#ddd"}`,
+                  background: active ? sc.bg : "#fff", color: active ? sc.text : "#aaa",
+                  fontWeight: active ? 700 : 500, fontSize: 11, cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif", textTransform: "capitalize",
+                }}>{s}</button>
+              );
+            })}
+          </div>
+        </div>
+        <div>
+          <Label>Checklist</Label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {[["recorded","🎬 Recorded"], ["edited","✂️ Edited"], ["captioned","✍️ Caption written"], ["approved","✅ Approved"], ["posted","📲 Posted"]].map(([key, label]) => {
+              const checked = post.checklist?.[key] || false;
+              return (
+                <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12 }}>
+                  <input type="checkbox" checked={checked} onChange={e => update("checklist", { ...(post.checklist || {}), [key]: e.target.checked })}
+                    style={{ width: 14, height: 14, cursor: "pointer" }} />
+                  <span style={{ color: checked ? "#2E7D32" : "#555", textDecoration: checked ? "line-through" : "none", opacity: checked ? 0.7 : 1 }}>{label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
         <div><Label>What to Order</Label><EditableText value={post.order} onChange={v => update("order", v)} /></div>
         <div><Label>Content Format</Label><EditableText value={post.format} onChange={v => update("format", v)} /></div>
         <div><Label>Caption Hook</Label><EditableText value={post.hook} onChange={v => update("hook", v)} multiline /></div>
         <div><Label>Est. Budget</Label><EditableText value={post.cost} onChange={v => update("cost", v)} /></div>
+        <div><Label>Notes</Label><EditableText value={post.notes || ""} onChange={v => update("notes", v)} multiline style={{ minHeight: 48 }} /></div>
+        {vendors && vendors[post.spot]?.website && (
+          <a href={vendors[post.spot].website} target="_blank" rel="noreferrer" style={{
+            display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#1565C0",
+            textDecoration: "none", fontWeight: 600,
+          }}>🔗 {post.spot} website</a>
+        )}
         <button onClick={() => { onDelete(post.id); onClose(); }} style={{
           width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #e53935",
           background: "#fff", color: "#e53935", fontWeight: 600, fontSize: 12, cursor: "pointer",
@@ -457,6 +505,16 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate }) {
                   </div>
                 </div>
               )}
+              {v.website && (
+                <div style={{ marginTop: 14 }}>
+                  <a href={v.website} target="_blank" rel="noreferrer" style={{
+                    display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12,
+                    color: v.color, fontWeight: 600, textDecoration: "none",
+                    border: `1px solid ${v.color}40`, borderRadius: 8, padding: "5px 12px",
+                    background: `${v.color}0d`,
+                  }}>🔗 Visit website</a>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -622,6 +680,8 @@ export default function App() {
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverDate, setDragOverDate] = useState(null);
   const [dragOverListId, setDragOverListId] = useState(null);
+  const [filterSeries, setFilterSeries] = useState("");
+  const [filterPerson, setFilterPerson] = useState("");
   const saveTimer = useRef(null);
   const lastSavedJson = useRef("");
   const isRemoteUpdate = useRef(false);
@@ -770,7 +830,7 @@ export default function App() {
 
   const addPostOnDate = (date) => {
     const newId = Math.max(0, ...posts.map(p => p.id)) + 1;
-    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: "", foodDate: fmtDate(date), ma: "", ma2: "", pa: "", pa2: "", done: false }]);
+    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: "", foodDate: fmtDate(date), ma: "", ma2: "", pa: "", pa2: "", done: false, status: "idea", notes: "", checklist: { recorded: false, edited: false, captioned: false, approved: false, posted: false } }]);
     setSelectedId(newId);
   };
 
@@ -778,10 +838,33 @@ export default function App() {
 
   const selectedPost = posts.find(p => p.id === selectedId);
   const calDays = getCalendarDays(2026, currentMonth);
-  const monthPosts = posts.filter(p => parseDate(p.foodDate || p.date).getMonth() === currentMonth).sort((a, b) => (a.foodDate || a.date).localeCompare(b.foodDate || b.date));
+
+  const applyFilters = (list) => list.filter(p => {
+    if (filterSeries && p.series !== filterSeries) return false;
+    if (filterPerson && p.ma !== filterPerson && p.ma2 !== filterPerson && p.pa !== filterPerson && p.pa2 !== filterPerson) return false;
+    return true;
+  });
+
+  const monthPosts = applyFilters(posts.filter(p => parseDate(p.foodDate || p.date).getMonth() === currentMonth)).sort((a, b) => (a.foodDate || a.date).localeCompare(b.foodDate || b.date));
   const months = [3, 4, 5];
   const maCounts = {}; const paCounts = {};
   posts.forEach(p => { maCounts[p.ma] = (maCounts[p.ma]||0)+1; paCounts[p.pa] = (paCounts[p.pa]||0)+1; });
+
+  // Gap & conflict warnings per week
+  const weekWarnings = {};
+  QUARTER_WEEKS.forEach(w => {
+    const wEnd = new Date(w.sun); wEnd.setDate(wEnd.getDate() + 6);
+    const wPosts = posts.filter(p => {
+      const d = parseDate(p.foodDate || p.date);
+      return d >= w.sun && d <= wEnd;
+    });
+    if (wPosts.length === 0) weekWarnings[w.label] = "gap";
+    else {
+      const dateCounts = {};
+      wPosts.forEach(p => { const ds = p.foodDate || p.date; dateCounts[ds] = (dateCounts[ds]||0)+1; });
+      if (Object.values(dateCounts).some(c => c > 1)) weekWarnings[w.label] = "conflict";
+    }
+  });
 
   const calRows = [];
   for (let i = 0; i < calDays.length; i += 7) calRows.push(calDays.slice(i, i + 7));
@@ -840,13 +923,40 @@ export default function App() {
           ))}
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 14 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
           {Object.entries(SERIES_COLORS).map(([name, c]) => (
-            <div key={name} style={{ display: "flex", alignItems: "center", gap: 4, background: c.bg, borderRadius: 14, padding: "2px 9px", border: `1px solid ${c.accent}22` }}>
+            <div key={name} onClick={() => setFilterSeries(filterSeries === name ? "" : name)} style={{
+              display: "flex", alignItems: "center", gap: 4, background: c.bg, borderRadius: 14, padding: "2px 9px",
+              border: `1px solid ${filterSeries === name ? c.accent : c.accent + "22"}`,
+              cursor: "pointer", opacity: filterSeries && filterSeries !== name ? 0.4 : 1,
+              boxShadow: filterSeries === name ? `0 0 0 2px ${c.accent}55` : "none",
+            }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: c.accent }} />
               <span style={{ fontSize: 9, color: c.accent, fontWeight: 600 }}>{name}</span>
             </div>
           ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} style={{
+            border: "1px solid #ddd", borderRadius: 8, padding: "5px 10px", fontSize: 11,
+            fontFamily: "'DM Sans', sans-serif", background: filterPerson ? "#1a1a2e" : "#fff",
+            color: filterPerson ? "#fff" : "#555", cursor: "pointer",
+          }}>
+            <option value="">👤 All people</option>
+            <optgroup label="MAs">{MAs.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>
+            <optgroup label="PAs">{PAs.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>
+          </select>
+          {(filterSeries || filterPerson) && (
+            <button onClick={() => { setFilterSeries(""); setFilterPerson(""); }} style={{
+              fontSize: 11, padding: "5px 10px", borderRadius: 8, border: "1px solid #ddd",
+              background: "#fff", color: "#999", cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+            }}>✕ Clear filters</button>
+          )}
+          {(filterSeries || filterPerson) && (
+            <span style={{ fontSize: 11, color: "#555" }}>
+              {applyFilters(posts).length} of {posts.length} posts
+            </span>
+          )}
         </div>
       </div>
 
@@ -877,10 +987,13 @@ export default function App() {
                     <span style={{ fontSize: wk.label === "FINALS" ? 8 : 10, fontWeight: 800, color: isFinals ? "#F57F17" : isMidterm ? "#E65100" : "#1a1a2e", letterSpacing: 0.5, lineHeight: 1.2 }}>{wk.label}</span>
                     {isMidterm && <span style={{ fontSize: 7, color: "#E65100", fontWeight: 600, marginTop: 1 }}>MIDTERM</span>}
                     {isFinals && wk.label !== "FINALS" && <span style={{ fontSize: 7, color: "#F57F17", fontWeight: 600, marginTop: 1 }}>FINALS</span>}
+                    {weekWarnings[wk.label] === "gap" && <span title="No posts this week" style={{ fontSize: 8, color: "#aaa", marginTop: 2 }}>—</span>}
+                    {weekWarnings[wk.label] === "conflict" && <span title="Multiple posts on same day" style={{ fontSize: 8, color: "#E65100", marginTop: 2 }}>⚠</span>}
                   </>)}
                 </div>,
                 ...row.map(({ date, inMonth }, ci) => {
                   const dayPosts = posts.filter(p => sameDay(parseDate(p.foodDate || p.date), date));
+                  const filteredDayPosts = applyFilters(dayPosts);
                   const isToday = sameDay(date, new Date());
                   const hasPosts = dayPosts.length > 0;
                   const cellDateStr = fmtDate(date);
@@ -918,6 +1031,8 @@ export default function App() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                         {dayPosts.map(p => {
                           const sc = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#333" };
+                          const st = STATUS_COLORS[p.status || "idea"];
+                          const isFiltered = (filterSeries || filterPerson) && !filteredDayPosts.includes(p);
                           return (
                             <div key={p.id}
                               draggable={true}
@@ -927,7 +1042,7 @@ export default function App() {
                                 background: sc.bg, borderLeft: `3px solid ${sc.accent}`, borderRadius: 4,
                                 padding: "4px 5px 5px", fontSize: 9, color: sc.accent, fontWeight: 600,
                                 fontFamily: "'DM Sans', sans-serif",
-                                opacity: draggingId === p.id ? 0.4 : 1,
+                                opacity: draggingId === p.id ? 0.4 : isFiltered ? 0.2 : 1,
                                 cursor: "grab",
                               }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 3, marginBottom: 3 }}>
@@ -950,6 +1065,10 @@ export default function App() {
                                   {(() => { const d = parseDate(p.date); return `Post: ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })()}
                                 </div>
                               )}
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: 3, background: st.bg, borderRadius: 8, padding: "1px 5px", marginBottom: 2 }}>
+                                <div style={{ width: 4, height: 4, borderRadius: "50%", background: st.dot }} />
+                                <span style={{ fontSize: 7, color: st.text, fontWeight: 700, textTransform: "capitalize" }}>{p.status || "idea"}</span>
+                              </div>
                               <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
                                 <PersonDot name={p.ma} colorMap={MA_COLORS} size={16} fontSize={6} />
                                 <PersonDot name={p.ma2} colorMap={MA_COLORS} size={16} fontSize={6} />
