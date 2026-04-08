@@ -117,6 +117,12 @@ function getCalendarDays(year, month) {
 function parseDate(str) { const [y, m, d] = str.split("-").map(Number); return new Date(y, m - 1, d); }
 function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function sameDay(a, b) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function parseCost(str) {
+  if (!str) return 0;
+  const nums = (str.match(/\d+(\.\d+)?/g) || []).map(Number);
+  if (!nums.length) return 0;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
 
 function PersonDot({ name, colorMap, size = 18, fontSize = 7 }) {
   if (!name) return null;
@@ -260,7 +266,7 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onDuplicate, onVendorCli
         <div>
           <Label>Vendor</Label>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <Select value={post.spot} options={VENDOR_NAMES} onChange={v => update("spot", v)} style={{ flex: 1 }} />
+            <Select value={post.spot} options={Object.keys(vendors || {}).filter(k => k !== "__new__").sort()} onChange={v => update("spot", v)} style={{ flex: 1 }} />
             {vendors && vendors[post.spot] && (
               <button onClick={() => onVendorClick(post.spot)} title="View vendor details" style={{
                 flexShrink: 0, width: 30, height: 30, borderRadius: 6, border: "1px solid #ddd",
@@ -325,17 +331,24 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onDuplicate, onVendorCli
   );
 }
 
-function VendorPanel({ vendor, vendorData, onClose, onUpdate }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [ed, setEd] = useState(null);
+function VendorPanel({ vendor, vendorData, onClose, onUpdate, isNew, onCreateVendor, posts }) {
+  const [isEditing, setIsEditing] = useState(isNew || false);
+  const [ed, setEd] = useState(() => isNew ? {
+    name: "", emoji: "🍽️", color: "#888888", website: "",
+    location: "", phone: "", tags: [], hours: [], menu: [], deals: [], dietary: [],
+  } : null);
 
-  if (!vendorData) return null;
-  const v = vendorData;
+  if (!isNew && !vendorData) return null;
+  const v = vendorData || { emoji: "🍽️", color: "#888888", location: "", phone: "", tags: [], menu: [], deals: [], dietary: [], hours: {}, website: "" };
   const hours = Object.entries(v.hours || {});
   const menu = v.menu || [];
 
   const startEdit = () => {
     setEd({
+      name: vendor,
+      emoji: v.emoji || "🍽️",
+      color: v.color || "#888888",
+      website: v.website || "",
       location: v.location || "",
       phone: v.phone || "",
       tags: [...(v.tags || [])],
@@ -347,11 +360,18 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate }) {
     setIsEditing(true);
   };
 
-  const cancelEdit = () => { setIsEditing(false); setEd(null); };
+  const cancelEdit = () => {
+    if (isNew) { onClose(); return; }
+    setIsEditing(false);
+    setEd(null);
+  };
 
   const saveEdit = () => {
-    onUpdate({
+    const data = {
       ...v,
+      emoji: ed.emoji || v.emoji,
+      color: ed.color || v.color,
+      website: ed.website || "",
       location: ed.location,
       phone: ed.phone,
       tags: ed.tags.filter(t => t.trim()),
@@ -359,7 +379,12 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate }) {
       menu: ed.menu.filter(m => (m.name || "").trim()),
       deals: ed.deals.filter(d => d.trim()),
       dietary: ed.dietary.filter(d => d.trim()),
-    });
+    };
+    if (isNew) {
+      onCreateVendor(ed.name.trim() || "New Vendor", data);
+      return;
+    }
+    onUpdate(data);
     setIsEditing(false);
     setEd(null);
   };
@@ -391,12 +416,12 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate }) {
         boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
         fontFamily: "'DM Sans', system-ui, sans-serif",
       }}>
-        <div style={{ background: v.color, borderRadius: "16px 16px 0 0", padding: "20px 22px 16px", color: "#fff", position: "relative" }}>
+        <div style={{ background: (isNew && ed ? ed.color : null) || v.color, borderRadius: "16px 16px 0 0", padding: "20px 22px 16px", color: "#fff", position: "relative" }}>
           <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer", color: "#fff", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>{v.emoji}</div>
-          <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: "-0.3px" }}>{vendor}</div>
-          <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>{v.location}</div>
-          {v.phone && <div style={{ fontSize: 12, opacity: 0.75, marginTop: 1 }}>{v.phone}</div>}
+          <div style={{ fontSize: 28, marginBottom: 6 }}>{isNew && ed ? (ed.emoji || "🍽️") : v.emoji}</div>
+          <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: "-0.3px" }}>{isNew ? (ed?.name || "New Vendor") : vendor}</div>
+          <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>{isNew && ed ? ed.location : v.location}</div>
+          {!isNew && v.phone && <div style={{ fontSize: 12, opacity: 0.75, marginTop: 1 }}>{v.phone}</div>}
         </div>
 
         <div style={{ padding: "18px 22px 22px" }}>
@@ -414,8 +439,18 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate }) {
 
           {isEditing ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              {isNew && (
+                <>
+                  <div><div style={secLabel}>Vendor Name</div><input value={ed.name} onChange={e => setEd(p => ({ ...p, name: e.target.value }))} style={inp} placeholder="e.g. Taco Villa" autoFocus /></div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <div style={{ flex: 1 }}><div style={secLabel}>Emoji</div><input value={ed.emoji} onChange={e => setEd(p => ({ ...p, emoji: e.target.value }))} style={{ ...inp, width: 70 }} placeholder="🍽️" /></div>
+                    <div style={{ flex: 1 }}><div style={secLabel}>Color</div><input type="color" value={ed.color} onChange={e => setEd(p => ({ ...p, color: e.target.value }))} style={{ height: 34, width: 70, border: "1px solid #ddd", borderRadius: 6, padding: 2, cursor: "pointer" }} /></div>
+                  </div>
+                </>
+              )}
               <div><div style={secLabel}>Location</div><input value={ed.location} onChange={e => setEd(p => ({ ...p, location: e.target.value }))} style={inp} /></div>
               <div><div style={secLabel}>Phone</div><input value={ed.phone} onChange={e => setEd(p => ({ ...p, phone: e.target.value }))} style={inp} /></div>
+              <div><div style={secLabel}>Website</div><input value={ed.website || ""} onChange={e => setEd(p => ({ ...p, website: e.target.value }))} style={inp} placeholder="https://" /></div>
               <div><div style={secLabel}>Tags</div><EditList items={ed.tags} field="tags" placeholder="e.g. Vegetarian" /></div>
               <div>
                 <div style={secLabel}>Hours</div>
@@ -517,6 +552,31 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate }) {
                   }}>🔗 Visit website</a>
                 </div>
               )}
+              {posts && (() => {
+                const vPosts = posts.filter(p => p.spot === vendor).sort((a, b) => (a.foodDate || a.date).localeCompare(b.foodDate || b.date));
+                if (!vPosts.length) return null;
+                return (
+                  <div style={{ marginTop: 18, borderTop: "1px solid #f0f0ee", paddingTop: 16 }}>
+                    <div style={secLabel}>Posts ({vPosts.length})</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {vPosts.map(p => {
+                        const sc = STATUS_COLORS[p.status || "idea"];
+                        const sc2 = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#999" };
+                        return (
+                          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: "#f7f7f5", borderRadius: 8 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: sc2.accent, flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.series}</div>
+                              <div style={{ fontSize: 10, color: "#999" }}>Food: {p.foodDate || p.date}{p.date ? ` · Post: ${p.date}` : ""}</div>
+                            </div>
+                            <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 99, background: sc.bg, color: sc.text, fontWeight: 700, textTransform: "capitalize", flexShrink: 0 }}>{p.status || "idea"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
@@ -685,6 +745,7 @@ export default function App() {
   const [filterSeries, setFilterSeries] = useState("");
   const [filterPerson, setFilterPerson] = useState("");
   const [undoStack, setUndoStack] = useState(null); // { posts, msg }
+  const [creatingVendor, setCreatingVendor] = useState(false);
   const undoTimer = useRef(null);
   const saveTimer = useRef(null);
   const lastSavedJson = useRef("");
@@ -835,6 +896,26 @@ export default function App() {
     const clone = { ...post, id: newId, foodDate: fd, date: pd, done: false, status: "idea", notes: "" };
     setPosts(prev => [...prev, clone]);
     setSelectedId(newId);
+  };
+
+  const addVendor = () => {
+    setVendors(prev => ({
+      ...prev,
+      "__new__": { emoji: "🍽️", color: "#888888", location: "", phone: "", website: "", hours: {}, tags: [], deals: [], dietary: [], menu: [] },
+    }));
+    setActiveVendor("__new__");
+    setCreatingVendor(true);
+  };
+
+  const createVendor = (name, data) => {
+    setVendors(prev => {
+      const next = { ...prev };
+      delete next["__new__"];
+      next[name] = data;
+      return next;
+    });
+    setActiveVendor(null);
+    setCreatingVendor(false);
   };
 
   const dropOnDate = (postId, date) => {
@@ -1191,7 +1272,7 @@ export default function App() {
         const grouped = {};
         LOCATION_GROUPS.forEach(g => { grouped[g.key] = []; });
         Object.entries(vendors).forEach(([name, v]) => {
-          if (name === "TBD" || name === "Multiple / Roundup") return;
+          if (name === "TBD" || name === "Multiple / Roundup" || name === "__new__") return;
           const building = getBuilding(v.location || "");
           if (grouped[building]) grouped[building].push({ name, ...v });
         });
@@ -1201,6 +1282,10 @@ export default function App() {
               <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>
                 University Centers — {Object.values(grouped).flat().length} vendors
               </h3>
+              <button onClick={addVendor} style={{
+                fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 8, border: "none",
+                background: "#1a1a2e", color: "#fff", cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+              }}>+ Add Vendor</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20, alignItems: "start" }}>
               {LOCATION_GROUPS.map(group => {
@@ -1360,6 +1445,33 @@ export default function App() {
                 })}
               </div>
             </div>
+            {/* Budget estimate */}
+            {(() => {
+              const totalEst = Math.round(posts.reduce((sum, p) => sum + parseCost(p.cost), 0));
+              const bySeriesCost = {};
+              posts.forEach(p => { if (p.series) bySeriesCost[p.series] = (bySeriesCost[p.series] || 0) + parseCost(p.cost); });
+              return (
+                <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>Budget Estimate</span>
+                    <span style={{ fontSize: 14, color: "#E65100", fontWeight: 700 }}>${totalEst} est. total</span>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {SERIES_LIST.map(s => {
+                      const sc = SERIES_COLORS[s]; const cost = bySeriesCost[s];
+                      if (!cost) return null;
+                      return (
+                        <div key={s} style={{ display: "flex", alignItems: "center", gap: 5, background: sc.bg, borderRadius: 20, padding: "4px 10px" }}>
+                          <span style={{ fontSize: 11, color: sc.accent, fontWeight: 700 }}>{s}</span>
+                          <span style={{ fontSize: 11, color: sc.accent, fontWeight: 500 }}>${Math.round(cost)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#bbb", marginTop: 10 }}>Based on midpoint of cost ranges · actual costs may vary</div>
+                </div>
+              );
+            })()}
             {/* Team workload */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {[["Marketing Assistants", maLoad, MA_COLORS], ["Photography Assistants", paLoad, PA_COLORS]].map(([title, load, colors]) => (
@@ -1407,7 +1519,21 @@ export default function App() {
 
       {selectedPost && !activeVendor && <div onClick={() => setSelectedId(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.3)", zIndex: 99 }} />}
       <EditPanel post={selectedPost} onClose={() => setSelectedId(null)} onUpdate={updatePost} onDelete={deletePost} onDuplicate={duplicatePost} onVendorClick={setActiveVendor} vendors={vendors} />
-      {activeVendor && <VendorPanel vendor={activeVendor} vendorData={vendors[activeVendor]} onClose={() => setActiveVendor(null)} onUpdate={(data) => updateVendor(activeVendor, data)} />}
+      {activeVendor && <VendorPanel
+        vendor={activeVendor}
+        vendorData={vendors[activeVendor]}
+        onClose={() => {
+          if (creatingVendor) {
+            setVendors(prev => { const next = { ...prev }; delete next["__new__"]; return next; });
+            setCreatingVendor(false);
+          }
+          setActiveVendor(null);
+        }}
+        onUpdate={(data) => updateVendor(activeVendor, data)}
+        isNew={creatingVendor}
+        onCreateVendor={createVendor}
+        posts={posts}
+      />}
     </div>
   );
 }
