@@ -127,6 +127,15 @@ function parseCost(str) {
   if (!nums.length) return 0;
   return nums.reduce((a, b) => a + b, 0) / nums.length;
 }
+function isDueSoon(p) {
+  if (normalizeStatus(p.status) !== "scheduled") return false;
+  const fd = p.foodDate || p.date;
+  if (!fd) return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = parseDate(fd);
+  const diff = (d - today) / 86400000;
+  return diff >= 0 && diff <= 7;
+}
 
 function PersonDot({ name, colorMap, size = 18, fontSize = 7 }) {
   if (!name) return null;
@@ -191,11 +200,16 @@ function Label({ children }) {
   return <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#999", marginBottom: 4, fontWeight: 600 }}>{children}</div>;
 }
 
-function EditPanel({ post, onClose, onUpdate, onDelete, onDuplicate, onVendorClick, vendors }) {
+function EditPanel({ post, onClose, onUpdate, onDelete, onDuplicate, onVendorClick, vendors, onPrev, onNext }) {
+  const [copied, setCopied] = useState(false);
   if (!post) return null;
   const c = SERIES_COLORS[post.series] || { bg: "#f5f5f5", accent: "#333" };
   const update = (key, val) => onUpdate(post.id, key, val);
   const week = getWeekFromDate(post.date);
+  const copyHook = () => {
+    if (!post.hook) return;
+    navigator.clipboard.writeText(post.hook).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  };
 
   return (
     <div style={{
@@ -206,12 +220,21 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onDuplicate, onVendorCli
     }}>
       <style>{`@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
       <div style={{ background: c.accent, padding: "22px 20px 16px", color: "#fff" }}>
+        {(onPrev || onNext) && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            <button onClick={onPrev} disabled={!onPrev} style={{ background: onPrev ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)", border: "none", color: onPrev ? "#fff" : "rgba(255,255,255,0.3)", borderRadius: 6, padding: "3px 10px", cursor: onPrev ? "pointer" : "default", fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>‹ Prev</button>
+            <button onClick={onNext} disabled={!onNext} style={{ background: onNext ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)", border: "none", color: onNext ? "#fff" : "rgba(255,255,255,0.3)", borderRadius: 6, padding: "3px 10px", cursor: onNext ? "pointer" : "default", fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>Next ›</button>
+          </div>
+        )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <div style={{ fontSize: 10, opacity: 0.7, textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }}>
               {week === "F" ? "Finals Week" : week === "—" ? "No Quarter Week" : `Week ${week}`} · {post.series}
             </div>
-            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'Playfair Display', serif" }}>{post.spot}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'Playfair Display', serif" }}>{post.spot}</div>
+              {isDueSoon(post) && <span title="Food date within 7 days — still scheduled!" style={{ fontSize: 11, background: "rgba(255,255,255,0.9)", color: "#E65100", borderRadius: 6, padding: "2px 7px", fontWeight: 700 }}>⚡ Due soon</span>}
+            </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={() => update("done", !post.done)} title={post.done ? "Mark as not done" : "Mark as done"} style={{
@@ -302,7 +325,10 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onDuplicate, onVendorCli
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
             <Label>Caption Hook</Label>
-            <span style={{ fontSize: 10, color: (post.hook||"").length > 2000 ? "#e53935" : "#aaa" }}>{(post.hook||"").length}/2200</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 10, color: (post.hook||"").length > 2000 ? "#e53935" : "#aaa" }}>{(post.hook||"").length}/2200</span>
+              <button onClick={copyHook} title="Copy to clipboard" style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 5, border: "1px solid #ddd", background: copied ? "#E8F5E9" : "#f5f5f5", color: copied ? "#2E7D32" : "#888", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>{copied ? "✓ Copied" : "Copy"}</button>
+            </div>
           </div>
           <EditableText value={post.hook} onChange={v => update("hook", v)} multiline />
         </div>
@@ -995,6 +1021,11 @@ export default function App() {
     return true;
   });
 
+  const sortedForNav = applyFilters([...posts].sort((a, b) => (a.foodDate || a.date).localeCompare(b.foodDate || b.date)));
+  const navIdx = sortedForNav.findIndex(p => p.id === selectedId);
+  const prevPost = navIdx > 0 ? sortedForNav[navIdx - 1] : null;
+  const nextPost = navIdx >= 0 && navIdx < sortedForNav.length - 1 ? sortedForNav[navIdx + 1] : null;
+
   const monthPosts = applyFilters(posts.filter(p => parseDate(p.foodDate || p.date).getMonth() === currentMonth)).sort((a, b) => (a.foodDate || a.date).localeCompare(b.foodDate || b.date));
   const months = [3, 4, 5];
   const maCounts = {}; const paCounts = {};
@@ -1250,6 +1281,7 @@ export default function App() {
                                 cursor: "grab",
                               }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 3, marginBottom: 3 }}>
+                                {isDueSoon(p) && <span title="Food date within 7 days" style={{ color: "#E65100", fontSize: 9, flexShrink: 0, lineHeight: 1 }}>⚡</span>}
                                 {p.done && <span style={{ color: "#2E7D32", fontWeight: 900, fontSize: 10, flexShrink: 0, lineHeight: 1 }}>✓</span>}
                                 {vendors[p.spot] && (
                                   <button onClick={(e) => { e.stopPropagation(); setActiveVendor(p.spot); }} title="Vendor details" style={{
@@ -1335,7 +1367,10 @@ export default function App() {
                             borderLeft: `3px solid ${sc.accent}`, cursor: "pointer",
                             opacity: isFiltered ? 0.2 : 1,
                           }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: sc.accent, marginBottom: 2 }}>{p.spot}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: sc.accent }}>{p.spot}</div>
+                              {isDueSoon(p) && <span title="Due within 7 days" style={{ fontSize: 9, color: "#E65100", fontWeight: 700 }}>⚡</span>}
+                            </div>
                             <div style={{ fontSize: 9, color: "#888", marginBottom: 4 }}>{p.series}</div>
                             {p.hook && <div style={{ fontSize: 10, color: "#444", lineHeight: 1.4, marginBottom: 5 }}>{p.hook}</div>}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1412,7 +1447,10 @@ export default function App() {
                             </div>
                             {vendors[p.spot] && <div style={{ fontSize: 22, flexShrink: 0 }}>{vendors[p.spot].emoji}</div>}
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: darkMode ? "#e5e7eb" : "#1a1a2e" }}>{p.spot}</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: darkMode ? "#e5e7eb" : "#1a1a2e" }}>{p.spot}</span>
+                                {isDueSoon(p) && <span title="Food date within 7 days" style={{ fontSize: 10, color: "#E65100", fontWeight: 700, background: "#FFF3E0", borderRadius: 5, padding: "1px 6px" }}>⚡ due soon</span>}
+                              </div>
                               <div style={{ fontSize: 10, color: sc.accent, fontWeight: 600, marginTop: 1 }}>{p.series}</div>
                               {p.hook && <div style={{ fontSize: 10, color: darkMode ? "#9ca3af" : "#666", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.hook}</div>}
                             </div>
@@ -1768,7 +1806,7 @@ export default function App() {
       )}
 
       {selectedPost && !activeVendor && <div onClick={() => setSelectedId(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.3)", zIndex: 99 }} />}
-      <EditPanel post={selectedPost} onClose={() => setSelectedId(null)} onUpdate={updatePost} onDelete={deletePost} onDuplicate={duplicatePost} onVendorClick={setActiveVendor} vendors={vendors} />
+      <EditPanel post={selectedPost} onClose={() => setSelectedId(null)} onUpdate={updatePost} onDelete={deletePost} onDuplicate={duplicatePost} onVendorClick={setActiveVendor} vendors={vendors} onPrev={prevPost ? () => setSelectedId(prevPost.id) : null} onNext={nextPost ? () => setSelectedId(nextPost.id) : null} />
       {activeVendor && <VendorPanel
         vendor={activeVendor}
         vendorData={vendors[activeVendor]}
