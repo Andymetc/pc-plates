@@ -754,6 +754,8 @@ export default function App() {
     const today = new Date(); const d = new Date(today);
     d.setDate(today.getDate() - today.getDay()); d.setHours(0,0,0,0); return d;
   });
+  const [compact, setCompact] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const undoTimer = useRef(null);
   const saveTimer = useRef(null);
   const lastSavedJson = useRef("");
@@ -1010,7 +1012,7 @@ export default function App() {
   for (let i = 0; i < calDays.length; i += 7) calRows.push(calDays.slice(i, i + 7));
 
   return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif", background: "#FAFAF8", minHeight: "100vh", padding: "20px 16px" }}>
+    <div style={{ fontFamily: "'DM Sans', sans-serif", background: darkMode ? "#111827" : "#FAFAF8", minHeight: "100vh", padding: "20px 16px", color: darkMode ? "#e5e7eb" : "#1a1a2e", transition: "background 0.2s, color 0.2s" }}>
       <div style={{ maxWidth: 1000, margin: "0 auto 16px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 2 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
@@ -1030,6 +1032,11 @@ export default function App() {
               fontSize: 11, fontWeight: 600, cursor: sheetSyncing ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif",
             }}>{sheetSyncing ? "⏳ Syncing…" : "↓ Import from Sheet"}</button>
             {sheetMsg && <span style={{ fontSize: 11, color: sheetMsg.startsWith("✓") ? "#2E7D32" : "#E65100", fontWeight: 600 }}>{sheetMsg}</span>}
+            <button onClick={() => setDarkMode(d => !d)} title="Toggle dark mode" style={{
+              padding: "5px 9px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer",
+              background: darkMode ? "#1a1a2e" : "#fff", color: darkMode ? "#fbbf24" : "#555", fontSize: 14,
+              fontFamily: "'DM Sans', sans-serif",
+            }}>{darkMode ? "☀️" : "🌙"}</button>
           </div>
         </div>
         <p style={{ fontSize: 12, color: "#777", margin: "4px 0 12px" }}>
@@ -1059,7 +1066,14 @@ export default function App() {
             padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer",
             fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, background: "#fff", color: "#555",
           }}>Today</button>
-          {["calendar", "week", "list", "vendors", "overview"].map(v => (
+          {view === "calendar" && (
+            <button onClick={() => setCompact(c => !c)} title="Toggle compact cards" style={{
+              padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600,
+              background: compact ? "#1a1a2e" : "#fff", color: compact ? "#fff" : "#555",
+            }}>{compact ? "⊞ Compact" : "⊟ Compact"}</button>
+          )}
+          {["calendar", "week", "timeline", "list", "vendors", "overview"].map(v => (
             <button key={v} onClick={() => setView(v)} style={{
               padding: "6px 14px", borderRadius: 8, cursor: "pointer",
               fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600,
@@ -1067,7 +1081,7 @@ export default function App() {
               background: view === v ? "#1a1a2e" : "#fff",
               color: view === v ? "#fff" : "#555",
             }}>
-              {v === "calendar" ? "📅 Calendar" : v === "week" ? "📆 Week" : v === "list" ? "📋 List" : v === "vendors" ? "🏪 Vendors" : "📊 Overview"}
+              {v === "calendar" ? "📅 Cal" : v === "week" ? "📆 Week" : v === "timeline" ? "📋 Timeline" : v === "list" ? "☰ List" : v === "vendors" ? "🏪 Vendors" : "📊 Overview"}
             </button>
           ))}
         </div>
@@ -1208,22 +1222,22 @@ export default function App() {
                                   {p.spot === "TBD" ? "TBD" : p.spot.length > 13 ? p.spot.slice(0,11) + "…" : p.spot}
                                 </button>
                               </div>
-                              {p.date && (
+                              {!compact && p.date && (
                                 <div style={{ fontSize: 8, color: "#888", fontWeight: 600, marginBottom: 2, display: "flex", alignItems: "center", gap: 2 }}>
                                   <span>📅</span>
                                   {(() => { const d = parseDate(p.date); return `Post: ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })()}
                                 </div>
                               )}
-                              <div style={{ display: "inline-flex", alignItems: "center", gap: 3, background: st.bg, borderRadius: 8, padding: "1px 5px", marginBottom: 2 }}>
+                              {!compact && <div style={{ display: "inline-flex", alignItems: "center", gap: 3, background: st.bg, borderRadius: 8, padding: "1px 5px", marginBottom: 2 }}>
                                 <div style={{ width: 4, height: 4, borderRadius: "50%", background: st.dot }} />
                                 <span style={{ fontSize: 7, color: st.text, fontWeight: 700, textTransform: "capitalize" }}>{normalizeStatus(p.status)}</span>
-                              </div>
-                              <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
+                              </div>}
+                              {!compact && <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
                                 <PersonDot name={p.ma} colorMap={MA_COLORS} size={16} fontSize={6} />
                                 <PersonDot name={p.ma2} colorMap={MA_COLORS} size={16} fontSize={6} />
                                 <PersonDot name={p.pa} colorMap={PA_COLORS} size={16} fontSize={6} />
                                 <PersonDot name={p.pa2} colorMap={PA_COLORS} size={16} fontSize={6} />
-                              </div>
+                              </div>}
                             </div>
                           );
                         })}
@@ -1310,6 +1324,77 @@ export default function App() {
                 );
               })}
             </div>
+          </div>
+        );
+      })()}
+
+      {/* TIMELINE VIEW */}
+      {view === "timeline" && (() => {
+        const sorted = [...posts].sort((a, b) => (a.foodDate || a.date).localeCompare(b.foodDate || b.date));
+        return (
+          <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+            {QUARTER_WEEKS.map(wk => {
+              const wEnd = new Date(wk.sun); wEnd.setDate(wEnd.getDate() + 6);
+              const wPosts = sorted.filter(p => { const d = parseDate(p.foodDate || p.date); return d >= wk.sun && d <= wEnd; });
+              const filteredWPosts = applyFilters(wPosts);
+              const headerBg = wk.isFinals ? "#F57F17" : wk.isMidterm ? "#E65100" : "#1a1a2e";
+              return (
+                <div key={wk.label} style={{ marginBottom: 28 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: headerBg, padding: "3px 10px", borderRadius: 6, flexShrink: 0 }}>{wk.label}</span>
+                    <span style={{ fontSize: 10, color: "#aaa" }}>
+                      {MONTHS[wk.sun.getMonth()].slice(0,3)} {wk.sun.getDate()} – {MONTHS[wEnd.getMonth()].slice(0,3)} {wEnd.getDate()}
+                    </span>
+                    {weekWarnings[wk.label] === "conflict" && <span style={{ fontSize: 10, color: "#E65100", fontWeight: 600 }}>⚠ same-day conflict</span>}
+                    <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+                    <span style={{ fontSize: 10, color: "#bbb" }}>{wPosts.length} post{wPosts.length !== 1 ? "s" : ""}</span>
+                  </div>
+                  {wPosts.length === 0 ? (
+                    <div style={{ fontSize: 11, color: "#ccc", padding: "6px 0" }}>No posts this week</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {wPosts.map(p => {
+                        const sc = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#333" };
+                        const st = STATUS_COLORS[normalizeStatus(p.status)];
+                        const isFiltered = (filterSeries || filterPerson) && !filteredWPosts.includes(p);
+                        const fd = parseDate(p.foodDate || p.date);
+                        return (
+                          <div key={p.id} onClick={() => setSelectedId(p.id)} style={{
+                            display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+                            background: darkMode ? "#1e293b" : "#fff", borderRadius: 10, cursor: "pointer",
+                            borderLeft: `4px solid ${sc.accent}`, opacity: isFiltered ? 0.25 : 1,
+                            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                          }}>
+                            <div style={{ minWidth: 44, textAlign: "center", flexShrink: 0 }}>
+                              <div style={{ fontSize: 20, fontWeight: 700, color: sc.accent, lineHeight: 1 }}>{fd.getDate()}</div>
+                              <div style={{ fontSize: 9, color: "#aaa", textTransform: "uppercase" }}>{MONTHS[fd.getMonth()].slice(0,3)}</div>
+                            </div>
+                            {vendors[p.spot] && <div style={{ fontSize: 22, flexShrink: 0 }}>{vendors[p.spot].emoji}</div>}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: darkMode ? "#e5e7eb" : "#1a1a2e" }}>{p.spot}</div>
+                              <div style={{ fontSize: 10, color: sc.accent, fontWeight: 600, marginTop: 1 }}>{p.series}</div>
+                              {p.hook && <div style={{ fontSize: 10, color: darkMode ? "#9ca3af" : "#666", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.hook}</div>}
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 3, background: st.bg, borderRadius: 12, padding: "3px 8px" }}>
+                                <div style={{ width: 5, height: 5, borderRadius: "50%", background: st.dot }} />
+                                <span style={{ fontSize: 10, color: st.text, fontWeight: 700, textTransform: "capitalize" }}>{normalizeStatus(p.status)}</span>
+                              </div>
+                              {p.date && <span style={{ fontSize: 9, color: "#aaa" }}>📅 {p.date.slice(5)}</span>}
+                            </div>
+                            <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+                              {[p.ma, p.ma2, p.pa, p.pa2].filter(Boolean).map((name, i) => (
+                                <div key={i} title={name} style={{ width: 22, height: 22, borderRadius: "50%", background: MA_COLORS[name] || PA_COLORS[name] || "#999", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700 }}>{name.charAt(0)}</div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         );
       })()}
