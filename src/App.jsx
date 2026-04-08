@@ -287,21 +287,6 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onVendorClick, vendors }
             })}
           </div>
         </div>
-        <div>
-          <Label>Checklist</Label>
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            {[["recorded","🎬 Recorded"], ["edited","✂️ Edited"], ["captioned","✍️ Caption written"], ["approved","✅ Approved"], ["posted","📲 Posted"]].map(([key, label]) => {
-              const checked = post.checklist?.[key] || false;
-              return (
-                <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12 }}>
-                  <input type="checkbox" checked={checked} onChange={e => update("checklist", { ...(post.checklist || {}), [key]: e.target.checked })}
-                    style={{ width: 14, height: 14, cursor: "pointer" }} />
-                  <span style={{ color: checked ? "#2E7D32" : "#555", textDecoration: checked ? "line-through" : "none", opacity: checked ? 0.7 : 1 }}>{label}</span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
         <div><Label>What to Order</Label><EditableText value={post.order} onChange={v => update("order", v)} /></div>
         <div><Label>Content Format</Label><EditableText value={post.format} onChange={v => update("format", v)} /></div>
         <div><Label>Caption Hook</Label><EditableText value={post.hook} onChange={v => update("hook", v)} multiline /></div>
@@ -830,7 +815,7 @@ export default function App() {
 
   const addPostOnDate = (date) => {
     const newId = Math.max(0, ...posts.map(p => p.id)) + 1;
-    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: "", foodDate: fmtDate(date), ma: "", ma2: "", pa: "", pa2: "", done: false, status: "idea", notes: "", checklist: { recorded: false, edited: false, captioned: false, approved: false, posted: false } }]);
+    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: "", foodDate: fmtDate(date), ma: "", ma2: "", pa: "", pa2: "", done: false, status: "idea", notes: "" }]);
     setSelectedId(newId);
   };
 
