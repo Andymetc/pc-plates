@@ -13,14 +13,18 @@ const SERIES_COLORS = {
 };
 const SERIES_LIST = Object.keys(SERIES_COLORS);
 
-const STATUS_OPTIONS = ["idea", "scheduled", "recorded", "editing", "posted"];
+const STATUS_OPTIONS = ["scheduled", "recorded", "posted"];
 const STATUS_COLORS = {
-  idea:       { bg: "#f5f5f5", text: "#999",    dot: "#ccc" },
   scheduled:  { bg: "#E3F2FD", text: "#1565C0", dot: "#1565C0" },
   recorded:   { bg: "#FFF3E0", text: "#E65100", dot: "#E65100" },
-  editing:    { bg: "#F3E5F5", text: "#6A1B9A", dot: "#6A1B9A" },
   posted:     { bg: "#E8F5E9", text: "#2E7D32", dot: "#2E7D32" },
 };
+// Map old status values to the new 3-option set
+function normalizeStatus(s) {
+  if (s === "posted") return "posted";
+  if (s === "recorded" || s === "editing") return "recorded";
+  return "scheduled"; // idea, scheduled, undefined → scheduled
+}
 
 
 const MA_COLORS = {
@@ -281,7 +285,7 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onDuplicate, onVendorCli
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             {STATUS_OPTIONS.map(s => {
               const sc = STATUS_COLORS[s];
-              const active = (post.status || "idea") === s;
+              const active = (normalizeStatus(post.status)) === s;
               return (
                 <button key={s} onClick={() => update("status", s)} style={{
                   padding: "4px 10px", borderRadius: 20, border: `1px solid ${active ? sc.dot : "#ddd"}`,
@@ -560,7 +564,7 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate, isNew, onCreateVen
                     <div style={secLabel}>Posts ({vPosts.length})</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {vPosts.map(p => {
-                        const sc = STATUS_COLORS[p.status || "idea"];
+                        const sc = STATUS_COLORS[normalizeStatus(p.status)];
                         const sc2 = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#999" };
                         return (
                           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: "#f7f7f5", borderRadius: 8 }}>
@@ -569,7 +573,7 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate, isNew, onCreateVen
                               <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.series}</div>
                               <div style={{ fontSize: 10, color: "#999" }}>Food: {p.foodDate || p.date}{p.date ? ` · Post: ${p.date}` : ""}</div>
                             </div>
-                            <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 99, background: sc.bg, color: sc.text, fontWeight: 700, textTransform: "capitalize", flexShrink: 0 }}>{p.status || "idea"}</span>
+                            <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 99, background: sc.bg, color: sc.text, fontWeight: 700, textTransform: "capitalize", flexShrink: 0 }}>{normalizeStatus(p.status)}</span>
                           </div>
                         );
                       })}
@@ -845,6 +849,28 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+      if (e.key === "Escape") {
+        if (activeVendor) { setActiveVendor(null); setCreatingVendor(false); }
+        else if (selectedId) setSelectedId(null);
+        else if (filterSeries || filterPerson) { setFilterSeries(""); setFilterPerson(""); }
+      }
+      if (e.key === "ArrowLeft") {
+        if (view === "week") { setCurrentWeekSun(d => { const n = new Date(d); n.setDate(d.getDate() - 7); return n; }); }
+        else setCurrentMonth(m => Math.max(3, m - 1));
+      }
+      if (e.key === "ArrowRight") {
+        if (view === "week") { setCurrentWeekSun(d => { const n = new Date(d); n.setDate(d.getDate() + 7); return n; }); }
+        else setCurrentMonth(m => Math.min(5, m + 1));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeVendor, selectedId, filterSeries, filterPerson, view]);
+
   const updateVendor = (name, data) => {
     const next = { ...vendors, [name]: data };
     setVendors(next);
@@ -897,7 +923,7 @@ export default function App() {
     const newId = Math.max(0, ...posts.map(p => p.id)) + 1;
     const fd = post.foodDate || post.date;
     const pd = fd ? (() => { const d = new Date(fd + "T00:00:00"); d.setDate(d.getDate() + 2); return fmtDate(d); })() : post.date;
-    const clone = { ...post, id: newId, foodDate: fd, date: pd, done: false, status: "idea", notes: "" };
+    const clone = { ...post, id: newId, foodDate: fd, date: pd, done: false, status: "scheduled", notes: "" };
     setPosts(prev => [...prev, clone]);
     setSelectedId(newId);
   };
@@ -944,7 +970,7 @@ export default function App() {
 
   const addPostOnDate = (date) => {
     const newId = Math.max(0, ...posts.map(p => p.id)) + 1;
-    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: "", foodDate: fmtDate(date), ma: "", ma2: "", pa: "", pa2: "", done: false, status: "idea", notes: "" }]);
+    setPosts(prev => [...prev, { id: newId, series: "Cheap Eats", spot: "TBD", order: "TBD", format: "Reel", hook: "", cost: "$0", date: "", foodDate: fmtDate(date), ma: "", ma2: "", pa: "", pa2: "", done: false, status: "scheduled", notes: "" }]);
     setSelectedId(newId);
   };
 
@@ -1154,7 +1180,7 @@ export default function App() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                         {dayPosts.map(p => {
                           const sc = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#333" };
-                          const st = STATUS_COLORS[p.status || "idea"];
+                          const st = STATUS_COLORS[normalizeStatus(p.status)];
                           const isFiltered = (filterSeries || filterPerson) && !filteredDayPosts.includes(p);
                           return (
                             <div key={p.id}
@@ -1190,7 +1216,7 @@ export default function App() {
                               )}
                               <div style={{ display: "inline-flex", alignItems: "center", gap: 3, background: st.bg, borderRadius: 8, padding: "1px 5px", marginBottom: 2 }}>
                                 <div style={{ width: 4, height: 4, borderRadius: "50%", background: st.dot }} />
-                                <span style={{ fontSize: 7, color: st.text, fontWeight: 700, textTransform: "capitalize" }}>{p.status || "idea"}</span>
+                                <span style={{ fontSize: 7, color: st.text, fontWeight: 700, textTransform: "capitalize" }}>{normalizeStatus(p.status)}</span>
                               </div>
                               <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
                                 <PersonDot name={p.ma} colorMap={MA_COLORS} size={16} fontSize={6} />
@@ -1246,7 +1272,7 @@ export default function App() {
                     <div style={{ padding: 6, display: "flex", flexDirection: "column", gap: 6 }}>
                       {dayPosts.map(p => {
                         const sc = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#333" };
-                        const st = STATUS_COLORS[p.status || "idea"];
+                        const st = STATUS_COLORS[normalizeStatus(p.status)];
                         const isFiltered = (filterSeries || filterPerson) && !filteredDayPosts.includes(p);
                         return (
                           <div key={p.id} onClick={() => setSelectedId(p.id)} style={{
@@ -1260,7 +1286,7 @@ export default function App() {
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 3, background: st.bg, borderRadius: 99, padding: "2px 7px" }}>
                                 <div style={{ width: 5, height: 5, borderRadius: "50%", background: st.dot }} />
-                                <span style={{ fontSize: 9, color: st.text, fontWeight: 700, textTransform: "capitalize" }}>{p.status || "idea"}</span>
+                                <span style={{ fontSize: 9, color: st.text, fontWeight: 700, textTransform: "capitalize" }}>{normalizeStatus(p.status)}</span>
                               </div>
                               {p.date && <span style={{ fontSize: 9, color: "#bbb" }}>📅 {p.date.slice(5)}</span>}
                             </div>
@@ -1484,7 +1510,7 @@ export default function App() {
       {view === "overview" && (() => {
         const done = posts.filter(p => p.status === "posted" || p.done).length;
         const byStatus = {};
-        STATUS_OPTIONS.forEach(s => { byStatus[s] = posts.filter(p => (p.status || "idea") === s).length; });
+        STATUS_OPTIONS.forEach(s => { byStatus[s] = posts.filter(p => (normalizeStatus(p.status)) === s).length; });
         const bySeries = {};
         SERIES_LIST.forEach(s => { bySeries[s] = { total: 0, done: 0 }; });
         posts.forEach(p => {
@@ -1573,7 +1599,11 @@ export default function App() {
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>{title}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {Object.entries(load).sort((a,b) => b[1]-a[1]).map(([name, count]) => (
-                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div key={name} onClick={() => setFilterPerson(filterPerson === name ? "" : name)} style={{
+                        display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderRadius: 8, padding: "2px 6px",
+                        background: filterPerson === name ? (colors[name] || "#999") + "14" : "transparent",
+                        outline: filterPerson === name ? `1px solid ${colors[name] || "#999"}40` : "none",
+                      }}>
                         <div style={{ width: 24, height: 24, borderRadius: "50%", background: colors[name]||"#999", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{name.charAt(0)}</div>
                         <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a2e", flex: 1 }}>{name}</span>
                         <div style={{ width: 80, background: "#f0f0ee", borderRadius: 4, height: 6, overflow: "hidden" }}>
