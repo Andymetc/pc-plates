@@ -705,9 +705,10 @@ const ROW_ID = 1;
 
 async function fetchPosts() {
   const { data, error } = await supabase.from(TABLE).select("posts").eq("id", ROW_ID).single();
-  if (error) { console.error("Fetch error:", error); return null; }
-  if (!data || !data.posts || !Array.isArray(data.posts) || data.posts.length === 0) return null;
-  return data.posts;
+  // Return { posts, existed } so callers know whether the row exists vs had an error
+  if (error && error.code !== "PGRST116") { console.error("Fetch error:", error); return { posts: null, existed: true }; }
+  if (!data || !data.posts || !Array.isArray(data.posts) || data.posts.length === 0) return { posts: null, existed: false };
+  return { posts: data.posts, existed: true };
 }
 
 async function savePosts(posts) {
@@ -792,17 +793,19 @@ export default function App() {
 
   // Load from Supabase on mount + subscribe to real-time changes
   useEffect(() => {
-    fetchPosts().then((data) => {
+    fetchPosts().then(({ posts: data, existed }) => {
       if (data) {
         const { migrated, changed } = migrateFoodDates(data);
         setPosts(migrated);
         lastSavedJson.current = JSON.stringify(migrated);
         if (changed) savePosts(migrated);
-      } else {
+      } else if (!existed) {
+        // Only seed defaults if the row genuinely doesn't exist yet (first-time setup)
         savePosts(DEFAULT_POSTS).then(() => {
           lastSavedJson.current = JSON.stringify(DEFAULT_POSTS);
         });
       }
+      // If existed but data was null/error, keep showing current state without overwriting
       setSynced(true);
     });
 
