@@ -784,6 +784,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [calendarStatusView, setCalendarStatusView] = useState("all");
   const undoTimer = useRef(null);
   const saveTimer = useRef(null);
   const lastSavedJson = useRef("");
@@ -1195,6 +1196,30 @@ export default function App() {
         </div>
       </div>
 
+      {/* CALENDAR STATUS FILTER TOGGLE */}
+      {view === "calendar" && (
+        <div style={{ maxWidth: 1000, margin: "0 auto 10px", display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: "#888", textTransform: "uppercase", letterSpacing: 0.8, marginRight: 2 }}>Show</span>
+          {[
+            { value: "all",      label: "All",      activeColor: "#1a1a2e", activeBg: "#1a1a2e", activeText: "#fff" },
+            { value: "recorded", label: "Recorded", activeColor: "#E65100", activeBg: "#FFF3E0", activeText: "#E65100" },
+            { value: "posted",   label: "Posted",   activeColor: "#2E7D32", activeBg: "#E8F5E9", activeText: "#2E7D32" },
+          ].map(({ value, label, activeColor, activeBg, activeText }) => {
+            const active = calendarStatusView === value;
+            return (
+              <button key={value} onClick={() => setCalendarStatusView(value)} style={{
+                fontSize: 11, fontWeight: 700, padding: "4px 14px", borderRadius: 99,
+                border: `1.5px solid ${active ? activeColor : "#ddd"}`,
+                background: active ? activeBg : "#fff",
+                color: active ? activeText : "#888",
+                cursor: "pointer", transition: "all 0.15s", letterSpacing: 0.3,
+                boxShadow: active ? `0 1px 4px ${activeColor}33` : "none",
+              }}>{label}</button>
+            );
+          })}
+        </div>
+      )}
+
       {/* CALENDAR VIEW */}
       {view === "calendar" && (
         <div style={{ maxWidth: 1000, margin: "0 auto" }}>
@@ -1265,6 +1290,7 @@ export default function App() {
                       )}
                       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                         {dayPosts.map(p => {
+                          if (calendarStatusView !== "all" && normalizeStatus(p.status) !== calendarStatusView) return null;
                           const sc = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#333" };
                           const st = STATUS_COLORS[normalizeStatus(p.status)];
                           const isFiltered = (filterSeries || filterPerson) && !filteredDayPosts.includes(p);
