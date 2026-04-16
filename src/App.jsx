@@ -302,6 +302,11 @@ function EditPanel({ post, onClose, onUpdate, onDelete, onDuplicate, onVendorCli
               }}>ℹ</button>
             )}
           </div>
+          {vendors && vendors[post.spot]?.inactive && (
+            <div style={{ marginTop: 6, background: "#FFF3E0", border: "1px solid #E6510030", borderRadius: 7, padding: "6px 10px", fontSize: 11, color: "#E65100", fontWeight: 600 }}>
+              🚫 This vendor is marked unavailable — consider swapping the spot
+            </div>
+          )}
         </div>
         <div>
           <Label>Status</Label>
@@ -457,13 +462,30 @@ function VendorPanel({ vendor, vendorData, onClose, onUpdate, isNew, onCreateVen
         <div style={{ padding: "18px 22px 22px" }}>
           {/* Edit toggle */}
           {!isEditing ? (
-            <button onClick={startEdit} style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 6, border: `1px solid ${v.color}50`, background: `${v.color}12`, color: v.color, cursor: "pointer", marginBottom: 16 }}>
-              Edit vendor info
-            </button>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+              <button onClick={startEdit} style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 6, border: `1px solid ${v.color}50`, background: `${v.color}12`, color: v.color, cursor: "pointer" }}>
+                Edit vendor info
+              </button>
+              {!isNew && (
+                <button onClick={() => onUpdate({ ...v, inactive: !v.inactive })} style={{
+                  fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 6, cursor: "pointer",
+                  border: v.inactive ? "1px solid #2E7D32" : "1px solid #E65100",
+                  background: v.inactive ? "#E8F5E9" : "#FFF3E0",
+                  color: v.inactive ? "#2E7D32" : "#E65100",
+                }}>
+                  {v.inactive ? "✓ Mark as available" : "🚫 Mark as unavailable"}
+                </button>
+              )}
+            </div>
           ) : (
             <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
               <button onClick={saveEdit} style={{ fontSize: 11, fontWeight: 700, padding: "6px 16px", borderRadius: 6, border: "none", background: "#2E7D32", color: "#fff", cursor: "pointer" }}>Save changes</button>
               <button onClick={cancelEdit} style={{ fontSize: 11, fontWeight: 600, padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#666", cursor: "pointer" }}>Cancel</button>
+            </div>
+          )}
+          {!isEditing && v.inactive && (
+            <div style={{ background: "#FFF3E0", border: "1px solid #E6510030", borderRadius: 8, padding: "8px 12px", marginBottom: 14, fontSize: 12, color: "#E65100", fontWeight: 600 }}>
+              🚫 This vendor is currently marked as unavailable
             </div>
           )}
 
@@ -1358,6 +1380,7 @@ export default function App() {
                               }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 3, marginBottom: 3 }}>
                                 {isDueSoon(p) && <span title="Food date within 7 days" style={{ color: "#E65100", fontSize: 9, flexShrink: 0, lineHeight: 1 }}>⚡</span>}
+                                {vendors[p.spot]?.inactive && <span title="Vendor unavailable" style={{ fontSize: 9, flexShrink: 0, lineHeight: 1 }}>🚫</span>}
                                 {p.done && <span style={{ color: "#2E7D32", fontWeight: 900, fontSize: 10, flexShrink: 0, lineHeight: 1 }}>✓</span>}
                                 {vendors[p.spot] && (
                                   <button onClick={(e) => { e.stopPropagation(); setActiveVendor(p.spot); }} title="Vendor details" style={{
@@ -1662,18 +1685,23 @@ export default function App() {
                               display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
                               cursor: "pointer", transition: "background 0.12s",
                               borderBottom: i < list.length - 1 ? "1px solid #f0f0ee" : "none",
+                              opacity: v.inactive ? 0.55 : 1,
                             }}
                             onMouseEnter={e => e.currentTarget.style.background = "#fafaf8"}
                             onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                           >
                             <div style={{
-                              width: 38, height: 38, borderRadius: 10, background: `${v.color}18`,
-                              border: `1.5px solid ${v.color}40`,
+                              width: 38, height: 38, borderRadius: 10,
+                              background: v.inactive ? "#f0f0ee" : `${v.color}18`,
+                              border: `1.5px solid ${v.inactive ? "#ccc" : v.color + "40"}`,
                               display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: 20, flexShrink: 0,
-                            }}>{v.emoji}</div>
+                              fontSize: 20, flexShrink: 0, filter: v.inactive ? "grayscale(1)" : "none",
+                            }}>{v.inactive ? "🚫" : v.emoji}</div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: v.inactive ? "#aaa" : "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: v.inactive ? "line-through" : "none" }}>{v.name}</div>
+                              {v.inactive && <span style={{ fontSize: 9, fontWeight: 700, color: "#E65100", background: "#FFF3E0", borderRadius: 99, padding: "1px 6px", border: "1px solid #E6510030", flexShrink: 0 }}>unavailable</span>}
+                              </div>
                               <div style={{ fontSize: 10, color: "#999", marginTop: 1 }}>
                                 {firstHours ? `${firstHours[0]}: ${firstHours[1]}` : v.location}
                               </div>

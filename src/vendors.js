@@ -192,6 +192,7 @@ export const VENDORS = {
     website: "https://www.shoresdiner.com",
     dietary: [],
     color: "#37474F",
+    inactive: true,
   },
   "Starbucks": {
     emoji: "☕",
@@ -207,6 +208,7 @@ export const VENDORS = {
     website: "https://www.starbucks.com",
     dietary: [],
     color: "#1B5E20",
+    inactive: true,
   },
   "Su Pan Bakery": {
     emoji: "🍞",
@@ -286,6 +288,7 @@ export const VENDORS = {
     website: "https://www.yelp.com/biz/taco-villa-san-diego",
     dietary: [],
     color: "#BF360C",
+    inactive: true,
   },
   "Tapioca Express": {
     emoji: "🧋",
