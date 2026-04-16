@@ -791,6 +791,8 @@ export default function App() {
   const lastSavedJson = useRef("");
   const isRemoteUpdate = useRef(false);
 
+  const LS_KEY = "pc-plates-backup";
+
   // Load from Supabase on mount + subscribe to real-time changes
   useEffect(() => {
     fetchPosts().then(({ posts: data, existed }) => {
@@ -798,14 +800,27 @@ export default function App() {
         const { migrated, changed } = migrateFoodDates(data);
         setPosts(migrated);
         lastSavedJson.current = JSON.stringify(migrated);
+        localStorage.setItem(LS_KEY, JSON.stringify(migrated));
         if (changed) savePosts(migrated);
       } else if (!existed) {
-        // Only seed defaults if the row genuinely doesn't exist yet (first-time setup)
-        savePosts(DEFAULT_POSTS).then(() => {
-          lastSavedJson.current = JSON.stringify(DEFAULT_POSTS);
-        });
+        // Check localStorage before seeding defaults
+        const lsData = (() => { try { const d = JSON.parse(localStorage.getItem(LS_KEY)); return Array.isArray(d) && d.length > 0 ? d : null; } catch { return null; } })();
+        if (lsData) {
+          setPosts(lsData);
+          lastSavedJson.current = JSON.stringify(lsData);
+          savePosts(lsData);
+        } else {
+          // Only seed defaults if no localStorage backup either (true first-time setup)
+          savePosts(DEFAULT_POSTS).then(() => {
+            lastSavedJson.current = JSON.stringify(DEFAULT_POSTS);
+            localStorage.setItem(LS_KEY, JSON.stringify(DEFAULT_POSTS));
+          });
+        }
+      } else {
+        // Supabase row exists but fetch failed — fall back to localStorage silently
+        const lsData = (() => { try { const d = JSON.parse(localStorage.getItem(LS_KEY)); return Array.isArray(d) && d.length > 0 ? d : null; } catch { return null; } })();
+        if (lsData) { setPosts(lsData); lastSavedJson.current = JSON.stringify(lsData); }
       }
-      // If existed but data was null/error, keep showing current state without overwriting
       setSynced(true);
     });
 
@@ -838,6 +853,7 @@ export default function App() {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       lastSavedJson.current = json;
+      localStorage.setItem(LS_KEY, json);
       savePosts(posts);
     }, 400);
 
@@ -1075,6 +1091,37 @@ export default function App() {
               fontSize: 11, fontWeight: 600, cursor: sheetSyncing ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif",
             }}>{sheetSyncing ? "⏳ Syncing…" : "↓ Import from Sheet"}</button>
             {sheetMsg && <span style={{ fontSize: 11, color: sheetMsg.startsWith("✓") ? "#2E7D32" : "#E65100", fontWeight: 600 }}>{sheetMsg}</span>}
+            <button onClick={() => {
+              const blob = new Blob([JSON.stringify(posts, null, 2)], { type: "application/json" });
+              const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+              a.download = `pc-plates-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+            }} title="Download all posts as JSON backup" style={{
+              display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 8,
+              border: "1px solid #ddd", background: "#fff", color: "#555",
+              fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+            }}>⬇ Export</button>
+            <label title="Import posts from a JSON backup file" style={{
+              display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 8,
+              border: "1px solid #ddd", background: "#fff", color: "#555",
+              fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+            }}>⬆ Import
+              <input type="file" accept=".json" style={{ display: "none" }} onChange={e => {
+                const file = e.target.files[0]; if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                  try {
+                    const imported = JSON.parse(ev.target.result);
+                    if (!Array.isArray(imported) || imported.length === 0) { alert("Invalid backup file."); return; }
+                    if (!window.confirm(`Import ${imported.length} posts? This will replace your current calendar.`)) return;
+                    setPosts(imported);
+                    savePosts(imported);
+                    localStorage.setItem(LS_KEY, JSON.stringify(imported));
+                  } catch { alert("Could not read file. Make sure it's a valid PC Plates JSON export."); }
+                };
+                reader.readAsText(file);
+                e.target.value = "";
+              }} />
+            </label>
             <button onClick={() => setDarkMode(d => !d)} title="Toggle dark mode" style={{
               padding: "5px 9px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer",
               background: darkMode ? "#1a1a2e" : "#fff", color: darkMode ? "#fbbf24" : "#555", fontSize: 14,
