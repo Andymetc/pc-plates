@@ -780,6 +780,25 @@ function migrateFoodDates(posts) {
   return { migrated, changed };
 }
 
+// One-time migration: assign realistic statuses based on foodDate if none set
+function migrateStatuses(posts) {
+  let changed = false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const migrated = posts.map(p => {
+    if (p.status) return p; // already has a status, leave it
+    const fd = p.foodDate ? parseDate(p.foodDate) : null;
+    if (!fd) return p;
+    const daysAgo = (today - fd) / 86400000;
+    let status;
+    if (daysAgo >= 8)       status = "posted";    // recorded 8+ days ago → posted
+    else if (daysAgo >= 0)  status = "recorded";  // recorded within the last week → in editing
+    else                    status = "scheduled";  // future
+    changed = true;
+    return { ...p, status };
+  });
+  return { migrated, changed };
+}
+
 // ─── MAIN APP ───
 
 export default function App() {
@@ -819,7 +838,9 @@ export default function App() {
   useEffect(() => {
     fetchPosts().then(({ posts: data, existed }) => {
       if (data) {
-        const { migrated, changed } = migrateFoodDates(data);
+        const { migrated: m1, changed: c1 } = migrateFoodDates(data);
+        const { migrated, changed: c2 } = migrateStatuses(m1);
+        const changed = c1 || c2;
         setPosts(migrated);
         lastSavedJson.current = JSON.stringify(migrated);
         localStorage.setItem(LS_KEY, JSON.stringify(migrated));
@@ -1776,73 +1797,174 @@ export default function App() {
 
       {/* OVERVIEW VIEW */}
       {view === "overview" && (() => {
-        const done = posts.filter(p => p.status === "posted" || p.done).length;
-        const byStatus = {};
-        STATUS_OPTIONS.forEach(s => { byStatus[s] = posts.filter(p => (normalizeStatus(p.status)) === s).length; });
+        const postedPosts   = posts.filter(p => normalizeStatus(p.status) === "posted");
+        const recordedPosts = posts.filter(p => normalizeStatus(p.status) === "recorded");
+        const scheduledPosts= posts.filter(p => normalizeStatus(p.status) === "scheduled");
+        const nPosted = postedPosts.length, nRecorded = recordedPosts.length, nScheduled = scheduledPosts.length;
+
         const bySeries = {};
-        SERIES_LIST.forEach(s => { bySeries[s] = { total: 0, done: 0 }; });
+        SERIES_LIST.forEach(s => { bySeries[s] = { total: 0, posted: 0, recorded: 0, scheduled: 0 }; });
         posts.forEach(p => {
-          if (!bySeries[p.series]) bySeries[p.series] = { total: 0, done: 0 };
+          if (!bySeries[p.series]) bySeries[p.series] = { total: 0, posted: 0, recorded: 0, scheduled: 0 };
           bySeries[p.series].total++;
-          if (p.status === "posted" || p.done) bySeries[p.series].done++;
+          const st = normalizeStatus(p.status);
+          bySeries[p.series][st] = (bySeries[p.series][st] || 0) + 1;
         });
+
         const maLoad = {}; const paLoad = {};
         posts.forEach(p => {
           [p.ma, p.ma2].filter(Boolean).forEach(n => { maLoad[n] = (maLoad[n]||0)+1; });
           [p.pa, p.pa2].filter(Boolean).forEach(n => { paLoad[n] = (paLoad[n]||0)+1; });
         });
+
+        const today = new Date(); today.setHours(0,0,0,0);
+        const quarterEnd = parseDate("2026-06-14");
+        const daysLeft = Math.max(0, Math.ceil((quarterEnd - today) / 86400000));
+
+        // Recent: last 4 posted or recorded, sorted by foodDate desc
+        const recentPosts = [...postedPosts, ...recordedPosts]
+          .sort((a,b) => (b.foodDate||b.date).localeCompare(a.foodDate||a.date)).slice(0, 4);
+        // Up next: first 3 scheduled by foodDate asc
+        const upNext = [...scheduledPosts]
+          .sort((a,b) => (a.foodDate||a.date).localeCompare(b.foodDate||b.date)).slice(0, 3);
+
+        const totalEst = Math.round(posts.reduce((sum, p) => sum + parseCost(p.cost), 0));
+        const spentEst = Math.round(postedPosts.reduce((sum, p) => sum + parseCost(p.cost), 0));
+
+        const statCard = (value, label, color, bg) => (
+          <div style={{ background: bg || "#fff", borderRadius: 12, padding: "18px 20px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)", flex: 1, minWidth: 110 }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color, fontFamily: "'Playfair Display', serif", lineHeight: 1 }}>{value}</div>
+            <div style={{ fontSize: 11, color: "#999", fontWeight: 600, marginTop: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+          </div>
+        );
+
         return (
-          <div style={{ maxWidth: 1000, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
-            {/* Progress bar */}
+          <div style={{ maxWidth: 1000, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+
+            {/* Stat cards row */}
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {statCard(nPosted,    "Posted",    "#2E7D32", "#F1FBF3")}
+              {statCard(nRecorded,  "In Editing", "#E65100", "#FFF8F5")}
+              {statCard(nScheduled, "Scheduled",  "#1565C0", "#F0F6FF")}
+              {statCard(daysLeft,   "Days Left",  "#1a1a2e", "#fff")}
+            </div>
+
+            {/* Segmented progress bar */}
             <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
                 <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e" }}>Quarter Progress</span>
-                <span style={{ fontSize: 13, color: "#2E7D32", fontWeight: 700 }}>{done} / {posts.length} posted</span>
+                <span style={{ fontSize: 12, color: "#888" }}>{nPosted + nRecorded} of {posts.length} complete or in progress</span>
               </div>
-              <div style={{ background: "#f0f0ee", borderRadius: 8, height: 10, overflow: "hidden" }}>
-                <div style={{ width: `${(done/posts.length)*100}%`, background: "#2E7D32", height: "100%", borderRadius: 8, transition: "width 0.4s" }} />
+              <div style={{ display: "flex", borderRadius: 8, height: 12, overflow: "hidden", background: "#f0f0ee" }}>
+                <div style={{ width: `${(nPosted/posts.length)*100}%`, background: "#2E7D32", transition: "width 0.4s" }} />
+                <div style={{ width: `${(nRecorded/posts.length)*100}%`, background: "#E65100", transition: "width 0.4s" }} />
               </div>
-              <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
-                {STATUS_OPTIONS.map(s => { const sc = STATUS_COLORS[s]; return byStatus[s] > 0 && (
-                  <div key={s} style={{ display: "flex", alignItems: "center", gap: 5, background: sc.bg, borderRadius: 20, padding: "4px 10px" }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} />
-                    <span style={{ fontSize: 11, color: sc.text, fontWeight: 700, textTransform: "capitalize" }}>{s}</span>
-                    <span style={{ fontSize: 11, color: sc.text, fontWeight: 700 }}>{byStatus[s]}</span>
+              <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+                {[["#2E7D32","#E8F5E9",`${nPosted} posted`],["#E65100","#FFF3E0",`${nRecorded} in editing`],["#1565C0","#E3F2FD",`${nScheduled} scheduled`]].map(([dot,bg,label]) => (
+                  <div key={label} style={{ display:"flex", alignItems:"center", gap:6, background:bg, borderRadius:20, padding:"3px 10px" }}>
+                    <div style={{ width:7, height:7, borderRadius:"50%", background:dot }} />
+                    <span style={{ fontSize:11, color:dot, fontWeight:700 }}>{label}</span>
                   </div>
-                ); })}
+                ))}
               </div>
             </div>
-            {/* Series breakdown */}
+
+            {/* By Series — enhanced */}
             <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>By Series</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", marginBottom: 16 }}>By Series</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {SERIES_LIST.map(s => {
-                  const sc = SERIES_COLORS[s]; const d = bySeries[s] || { total: 0, done: 0 };
+                  const sc = SERIES_COLORS[s]; const d = bySeries[s] || { total:0, posted:0, recorded:0, scheduled:0 };
                   if (!d.total) return null;
                   return (
                     <div key={s}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: sc.accent }}>{s}</span>
-                        <span style={{ fontSize: 11, color: "#999" }}>{d.done}/{d.total}</span>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <div style={{ width: 10, height: 10, borderRadius: 3, background: sc.accent }} />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a2e" }}>{s}</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {d.posted > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#2E7D32", background: "#E8F5E9", borderRadius: 99, padding: "1px 7px" }}>✓ {d.posted} posted</span>}
+                          {d.recorded > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#E65100", background: "#FFF3E0", borderRadius: 99, padding: "1px 7px" }}>● {d.recorded} editing</span>}
+                          {d.scheduled > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: "#888", background: "#f5f5f5", borderRadius: 99, padding: "1px 7px" }}>{d.scheduled} left</span>}
+                        </div>
                       </div>
-                      <div style={{ background: sc.bg, borderRadius: 6, height: 7, overflow: "hidden" }}>
-                        <div style={{ width: d.total ? `${(d.done/d.total)*100}%` : "0%", background: sc.accent, height: "100%", borderRadius: 6 }} />
+                      {/* Segmented mini bar */}
+                      <div style={{ display: "flex", borderRadius: 6, height: 7, overflow: "hidden", background: "#f0f0ee" }}>
+                        <div style={{ width: `${(d.posted/d.total)*100}%`, background: "#2E7D32" }} />
+                        <div style={{ width: `${(d.recorded/d.total)*100}%`, background: "#E65100" }} />
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
-            {/* Budget estimate */}
+
+            {/* Recent + Up Next side by side */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>🎬 Recently Done</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {recentPosts.map(p => {
+                    const sc = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#333" };
+                    const st = normalizeStatus(p.status);
+                    const fd = p.foodDate ? parseDate(p.foodDate) : null;
+                    return (
+                      <div key={p.id} onClick={() => { setSelectedId(p.id); setView("calendar"); }} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", borderRadius:8, padding:"6px 8px", background: sc.bg + "80" }}
+                        onMouseEnter={e => e.currentTarget.style.background = sc.bg}
+                        onMouseLeave={e => e.currentTarget.style.background = sc.bg + "80"}>
+                        <div style={{ width: 4, alignSelf:"stretch", borderRadius:2, background: sc.accent, flexShrink:0 }} />
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:12, fontWeight:700, color:"#1a1a2e", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.spot}</div>
+                          <div style={{ fontSize:10, color:"#999", marginTop:1 }}>{p.series} · {fd ? `${MONTHS[fd.getMonth()].slice(0,3)} ${fd.getDate()}` : ""}</div>
+                        </div>
+                        <span style={{ fontSize:9, fontWeight:700, padding:"2px 7px", borderRadius:99, background: st==="posted"?"#E8F5E9":"#FFF3E0", color: st==="posted"?"#2E7D32":"#E65100", flexShrink:0 }}>{st==="posted"?"✓ posted":"● editing"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>📅 Up Next</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {upNext.map(p => {
+                    const sc = SERIES_COLORS[p.series] || { bg: "#f5f5f5", accent: "#333" };
+                    const fd = p.foodDate ? parseDate(p.foodDate) : null;
+                    const today2 = new Date(); today2.setHours(0,0,0,0);
+                    const daysUntil = fd ? Math.ceil((fd - today2) / 86400000) : null;
+                    return (
+                      <div key={p.id} onClick={() => { setSelectedId(p.id); setView("calendar"); }} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", borderRadius:8, padding:"6px 8px" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#fafaf8"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <div style={{ width:4, alignSelf:"stretch", borderRadius:2, background: sc.accent, flexShrink:0 }} />
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:12, fontWeight:700, color:"#1a1a2e", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.spot}</div>
+                          <div style={{ fontSize:10, color:"#999", marginTop:1 }}>{p.series}</div>
+                        </div>
+                        <div style={{ textAlign:"right", flexShrink:0 }}>
+                          <div style={{ fontSize:11, fontWeight:700, color: daysUntil <= 7 ? "#E65100" : "#1565C0" }}>{daysUntil === 0 ? "Today" : daysUntil === 1 ? "Tomorrow" : `${daysUntil}d`}</div>
+                          <div style={{ fontSize:9, color:"#bbb" }}>{fd ? `${MONTHS[fd.getMonth()].slice(0,3)} ${fd.getDate()}` : ""}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {upNext.length === 0 && <div style={{ fontSize:12, color:"#ccc", fontStyle:"italic" }}>All posts recorded!</div>}
+                </div>
+              </div>
+            </div>
+
+            {/* Budget + Team workload */}
             {(() => {
-              const totalEst = Math.round(posts.reduce((sum, p) => sum + parseCost(p.cost), 0));
               const bySeriesCost = {};
               posts.forEach(p => { if (p.series) bySeriesCost[p.series] = (bySeriesCost[p.series] || 0) + parseCost(p.cost); });
               return (
                 <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>Budget Estimate</span>
-                    <span style={{ fontSize: 14, color: "#E65100", fontWeight: 700 }}>${totalEst} est. total</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>💰 Budget</span>
+                    <span style={{ fontSize: 12, color: "#888" }}><span style={{ color:"#2E7D32", fontWeight:700 }}>${spentEst} spent</span> · ${totalEst} est. total</span>
+                  </div>
+                  <div style={{ background:"#f0f0ee", borderRadius:8, height:8, overflow:"hidden", marginBottom:12 }}>
+                    <div style={{ width:`${totalEst ? (spentEst/totalEst)*100 : 0}%`, background:"#2E7D32", height:"100%", borderRadius:8 }} />
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {SERIES_LIST.map(s => {
@@ -1860,26 +1982,30 @@ export default function App() {
                 </div>
               );
             })()}
+
             {/* Team workload */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {[["Marketing Assistants", maLoad, MA_COLORS], ["Photography Assistants", paLoad, PA_COLORS]].map(([title, load, colors]) => (
                 <div key={title} style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>{title}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {Object.entries(load).sort((a,b) => b[1]-a[1]).map(([name, count]) => (
-                      <div key={name} onClick={() => setFilterPerson(filterPerson === name ? "" : name)} style={{
-                        display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderRadius: 8, padding: "2px 6px",
-                        background: filterPerson === name ? (colors[name] || "#999") + "14" : "transparent",
-                        outline: filterPerson === name ? `1px solid ${colors[name] || "#999"}40` : "none",
-                      }}>
-                        <div style={{ width: 24, height: 24, borderRadius: "50%", background: colors[name]||"#999", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{name.charAt(0)}</div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a2e", flex: 1 }}>{name}</span>
-                        <div style={{ width: 80, background: "#f0f0ee", borderRadius: 4, height: 6, overflow: "hidden" }}>
-                          <div style={{ width: `${(count/Math.max(...Object.values(load)))*100}%`, background: colors[name]||"#999", height: "100%" }} />
+                    {Object.entries(load).sort((a,b) => b[1]-a[1]).map(([name, count]) => {
+                      const personPosted = postedPosts.filter(p => p.ma===name||p.ma2===name||p.pa===name||p.pa2===name).length;
+                      return (
+                        <div key={name} onClick={() => setFilterPerson(filterPerson === name ? "" : name)} style={{
+                          display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderRadius: 8, padding: "4px 6px",
+                          background: filterPerson === name ? (colors[name] || "#999") + "14" : "transparent",
+                          outline: filterPerson === name ? `1px solid ${colors[name] || "#999"}40` : "none",
+                        }}>
+                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: colors[name]||"#999", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{name.charAt(0)}</div>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a2e", flex: 1 }}>{name}</span>
+                          <div style={{ width: 70, background: "#f0f0ee", borderRadius: 4, height: 6, overflow: "hidden" }}>
+                            <div style={{ width: `${(count/Math.max(...Object.values(load)))*100}%`, background: colors[name]||"#999", height: "100%" }} />
+                          </div>
+                          <span style={{ fontSize: 10, color: "#2E7D32", fontWeight: 700, minWidth: 28, textAlign: "right" }}>{personPosted}/{count}</span>
                         </div>
-                        <span style={{ fontSize: 11, color: "#999", fontWeight: 600, minWidth: 16, textAlign: "right" }}>{count}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
